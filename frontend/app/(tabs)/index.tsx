@@ -132,7 +132,11 @@ export default function HomeScreen() {
             renderItem={(item: any) => {
               if (item.type === 'create') {
                 return (
-                  <TouchableOpacity className="border-2 border-dashed border-secondary rounded-3xl justify-center items-center bg-surface" style={{ width: CARD_WIDTH, height: 260 }}>
+                  <TouchableOpacity 
+                    className="border-2 border-dashed border-secondary rounded-3xl justify-center items-center bg-surface" 
+                    style={{ width: CARD_WIDTH, height: 260 }}
+                    onPress={() => router.push('/create-coach')} 
+                  >
                     <View className="w-11 h-11 rounded-full border-[1.5px] border-secondary justify-center items-center mb-2.5">
                       <Ionicons name="add" size={22} className="text-secondary" />
                     </View>

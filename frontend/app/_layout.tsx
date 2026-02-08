@@ -13,13 +13,12 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const colorScheme = 'light';
+  const colorScheme = useColorScheme();
 
   return (
     <KeyboardProvider>
       <View style={{ flex: 1 }} className={colorScheme === 'dark' ? 'dark' : ''}>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          {/* Wrap the Stack with the Provider so all screens can access data */}
           <CoachProvider>
             <Stack>
               {/* Main App Navigation */}
@@ -28,13 +27,22 @@ export default function RootLayout() {
               {/* Auth Flow */}
               <Stack.Screen name="(auth)" options={{ headerShown: false }} />
 
-              {/* Chat Flow - Outside tabs for full screen */}
+              {/* Chat Flow */}
               <Stack.Screen
                 name="chat/[id]"
                 options={{
                   headerShown: false,
                   animation: 'slide_from_right'
                 }}
+              />
+
+              {/* Create Coach screen */}
+              <Stack.Screen 
+                name="create-coach" 
+                options={{ 
+                  headerShown: false,
+                  animation: 'slide_from_right'
+                }} 
               />
 
               <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />

@@ -30,7 +30,7 @@ if (!apiKey) throw new Error("GEMINI_API is not set");
 const genAI = new GoogleGenAI({ apiKey });
 
 Deno.serve(async (req) => {
-  // 2. Handle Preflight
+    // Handle CORS: checking to ensure Gemini call is doable
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
 
     // 7. Gemini Generation
     const chat = genAI.chats.create({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-pro",
       config: {
         systemInstruction: `${CORE_SYSTEM_PROMPT}\n\nCOACH PROFILE:\n${coachContext}`,
       },
