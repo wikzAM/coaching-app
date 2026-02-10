@@ -93,7 +93,6 @@ export default function RootLayout() {
                   }}
                 />
 
-                <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
                 <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Settings' }} />
               </Stack>
             </CoachProvider>

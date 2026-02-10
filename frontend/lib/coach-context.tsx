@@ -25,11 +25,13 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
 
   const fetchCoaches = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+          setCoaches([]);
           setIsLoading(false);
           return;
       }
+      const user = session.user;
 
       // 2. Fetch ONLY the coaches this user has hired
       const { data, error } = await supabase
@@ -38,8 +40,11 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
           coach_id,
           coaches (
             coach_id,
+            name,
             training_model,
-            personality
+            personality,
+            description,
+            created_by
           )
         `)
         .eq('user_id', user.id);
@@ -49,9 +54,9 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
       // 3. Format database data for your UI
       const formatted = data.map((item: any) => ({
         id: item.coaches.coach_id,
-        name: item.coaches.training_model || 'Coach',
+        name: item.coaches.name || item.coaches.training_model || 'Coach',
         specialty: item.coaches.personality || 'Generalist',
-        avatar: (item.coaches.training_model?.[0] || 'C').toUpperCase(),
+        avatar: (item.coaches.name?.[0] || item.coaches.training_model?.[0] || 'C').toUpperCase(),
         model: item.coaches.training_model,
       }));
 
@@ -65,6 +70,18 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     fetchCoaches();
+
+    // Re-fetch when auth state changes (login/logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        fetchCoaches();
+      } else {
+        setCoaches([]);
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   // Helper to check if a coach is already hired
