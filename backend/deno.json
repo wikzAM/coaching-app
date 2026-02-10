@@ -1,8 +1,13 @@
 {
+  "compilerOptions": {
+    "lib": [
+      "deno.window"
+    ]
+  },
   "imports": {
     "supabase-functions": "jsr:@supabase/functions-js@2",
     "google-gen": "npm:@google/genai@latest",
     "supabase": "npm:@supabase/supabase-js@^2.39.0",
-    "deno-server": "@supabase/functions-js/edge-runtime.d.ts"
+    "jose": "npm:jose@^5.2.0"
   }
 }

@@ -50,7 +50,7 @@ export default function RootLayout() {
     if (!initialized) return;
 
     // Check if the user is on the login screen or auth flow
-    const isAuthRoute = segments[0] === 'login' || segments[0] === '(auth)';
+    const isAuthRoute = segments[0] === 'login' || segments[0] === 'auth';
 
     // If NO session and NOT on auth route -> Redirect to Login
     if (!session && !isAuthRoute) {

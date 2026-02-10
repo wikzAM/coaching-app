@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import {
     View,
     Text,
@@ -6,83 +6,43 @@ import {
     ActivityIndicator,
     Alert,
     TextInput,
-    KeyboardAvoidingView,
-    Platform,
     ScrollView,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
 import GoogleIcon from '../components/google-icon';
+import Constants from 'expo-constants';
 
 WebBrowser.maybeCompleteAuthSession();
 
 type AuthMethod = 'phone' | 'google' | 'email';
-type PhoneStep = 'enter' | 'verify';
+
+// Check if running in Expo Go (where Firebase native modules aren't available)
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// Lazy load PhoneAuth only when not in Expo Go
+const PhoneAuth = !isExpoGo
+    ? React.lazy(() => import('../components/phone-auth'))
+    : null;
 
 export default function LoginScreen() {
     const [loading, setLoading] = useState(false);
-    const [authMethod, setAuthMethod] = useState<AuthMethod>('phone');
-
-    // Phone auth state
-    const [phoneNumber, setPhoneNumber] = useState('');
-    const [phoneStep, setPhoneStep] = useState<PhoneStep>('enter');
-    const [otpCode, setOtpCode] = useState('');
+    const [authMethod, setAuthMethod] = useState<AuthMethod>(isExpoGo ? 'google' : 'phone');
 
     // Email auth state
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isSignUp, setIsSignUp] = useState(false);
 
-    // ============ PHONE AUTH LOGIC ============
-    const onSendOTP = async () => {
-        if (!phoneNumber.trim()) {
-            Alert.alert('Error', 'Please enter your phone number');
-            return;
-        }
-        let formattedPhone = phoneNumber.trim();
-        if (!formattedPhone.startsWith('+')) {
-            formattedPhone = '+1' + formattedPhone.replace(/\D/g, '');
-        }
-        setLoading(true);
-        try {
-            const { error } = await supabase.auth.signInWithOtp({ phone: formattedPhone });
-            if (error) throw error;
-            setPhoneStep('verify');
-            Alert.alert('Code Sent', `Verification code sent to ${formattedPhone}`);
-        } catch (err: any) {
-            Alert.alert('Error', err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const onVerifyOTP = async () => {
-        if (!otpCode.trim() || otpCode.length !== 6) return;
-        let formattedPhone = phoneNumber.trim();
-        if (!formattedPhone.startsWith('+')) {
-            formattedPhone = '+1' + formattedPhone.replace(/\D/g, '');
-        }
-        setLoading(true);
-        try {
-            const { error } = await supabase.auth.verifyOtp({
-                phone: formattedPhone,
-                token: otpCode,
-                type: 'sms',
-            });
-            if (error) throw error;
-        } catch (err: any) {
-            Alert.alert('Error', err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     // ============ GOOGLE AUTH LOGIC ============
     const onGoogleLogin = async () => {
         setLoading(true);
         try {
-            const redirectUrl = Linking.createURL('/google-auth/callback');
+            // Use the scheme from app.json for deep linking
+            const redirectUrl = Linking.createURL('auth/callback');
+            console.log('OAuth redirect URL:', redirectUrl);
+            
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
@@ -91,7 +51,30 @@ export default function LoginScreen() {
                 },
             });
             if (error) throw error;
-            if (data?.url) await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+            
+            if (data?.url) {
+                const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+                console.log('WebBrowser result:', result);
+                
+                // Handle the result - extract tokens from URL if present
+                if (result.type === 'success' && result.url) {
+                    const url = new URL(result.url);
+                    const params = new URLSearchParams(url.hash.slice(1)); // Remove # from hash
+                    
+                    const accessToken = params.get('access_token');
+                    const refreshToken = params.get('refresh_token');
+                    
+                    if (accessToken && refreshToken) {
+                        const { error: sessionError } = await supabase.auth.setSession({
+                            access_token: accessToken,
+                            refresh_token: refreshToken,
+                        });
+                        if (sessionError) {
+                            Alert.alert('Error', sessionError.message);
+                        }
+                    }
+                }
+            }
         } catch (err: any) {
             Alert.alert('Error', err.message);
         } finally {
@@ -126,45 +109,23 @@ export default function LoginScreen() {
     };
 
     // ============ RENDER HELPERS ============
-    // We remove the complex View wrappers here to prevent NativeWind crashes
-    const renderPhoneAuth = () => (
-        <View className="w-full">
-            {phoneStep === 'enter' ? (
-                <>
-                    <Text className="text-sm text-gray-600 mb-2">Phone Number</Text>
-                    <TextInput
-                        className="w-full border border-gray-300 rounded-xl px-4 py-4 text-lg mb-4 bg-white"
-                        placeholder="+1 (555) 123-4567"
-                        placeholderTextColor="#9CA3AF"
-                        keyboardType="phone-pad"
-                        value={phoneNumber}
-                        onChangeText={setPhoneNumber}
-                    />
-                    <Pressable onPress={onSendOTP} disabled={loading} className="bg-black rounded-xl py-4 items-center">
-                        {loading ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-bold text-lg">Send Code</Text>}
-                    </Pressable>
-                </>
-            ) : (
-                <>
-                    <Text className="text-sm text-gray-600 mb-2">Enter Code</Text>
-                    <TextInput
-                        className="w-full border border-gray-300 rounded-xl px-4 py-4 text-2xl text-center mb-4 bg-white"
-                        placeholder="000000"
-                        keyboardType="number-pad"
-                        maxLength={6}
-                        value={otpCode}
-                        onChangeText={setOtpCode}
-                    />
-                    <Pressable onPress={onVerifyOTP} disabled={loading} className="bg-black rounded-xl py-4 items-center mb-3">
-                        {loading ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-bold text-lg">Verify</Text>}
-                    </Pressable>
-                    <Pressable onPress={() => setPhoneStep('enter')}>
-                        <Text className="text-gray-500 text-center">Change Number</Text>
-                    </Pressable>
-                </>
-            )}
-        </View>
-    );
+    const renderPhoneAuth = () => {
+        if (!PhoneAuth) {
+            return (
+                <View className="w-full items-center py-8">
+                    <Text className="text-gray-500 text-center">
+                        Phone auth is not available in Expo Go.{'\n'}
+                        Use a development build to enable phone login.
+                    </Text>
+                </View>
+            );
+        }
+        return (
+            <Suspense fallback={<ActivityIndicator size="large" color="#000" />}>
+                <PhoneAuth loading={loading} setLoading={setLoading} />
+            </Suspense>
+        );
+    };
 
     const renderGoogleAuth = () => (
         <View className="w-full">
@@ -207,6 +168,39 @@ export default function LoginScreen() {
         </View>
     );
 
+    // Available auth methods based on environment
+    const availableMethods: AuthMethod[] = isExpoGo ? ['google', 'email'] : ['phone', 'google', 'email'];
+
+    const renderTab = (method: AuthMethod) => {
+        const isActive = authMethod === method;
+        return (
+            <Pressable
+                key={method}
+                onPress={() => setAuthMethod(method)}
+                style={{
+                    flex: 1,
+                    paddingVertical: 12,
+                    borderRadius: 8,
+                    backgroundColor: isActive ? 'white' : 'transparent',
+                    shadowColor: isActive ? '#000' : 'transparent',
+                    shadowOpacity: isActive ? 0.1 : 0,
+                    shadowRadius: isActive ? 2 : 0,
+                }}
+            >
+                <Text
+                    style={{
+                        textAlign: 'center',
+                        fontWeight: '600',
+                        textTransform: 'capitalize',
+                        color: isActive ? 'black' : '#6B7280',
+                    }}
+                >
+                    {method}
+                </Text>
+            </Pressable>
+        );
+    };
+
     return (
         <View className="flex-1 bg-white">
             <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }} keyboardShouldPersistTaps="handled">
@@ -216,19 +210,9 @@ export default function LoginScreen() {
                     <Text className="text-gray-500 text-center">Sign in to your AI Coach</Text>
                 </View>
 
-                {/* TABS - Stabilized structure */}
-                <View className="flex-row mb-6 bg-gray-100 rounded-xl p-1 w-full">
-                    {(['phone', 'google', 'email'] as AuthMethod[]).map((method) => (
-                        <Pressable
-                            key={method}
-                            onPress={() => setAuthMethod(method)}
-                            className={`flex-1 py-3 rounded-lg ${authMethod === method ? 'bg-white shadow-sm' : ''}`}
-                        >
-                            <Text className={`text-center font-semibold capitalize ${authMethod === method ? 'text-black' : 'text-gray-500'}`}>
-                                {method}
-                            </Text>
-                        </Pressable>
-                    ))}
+                {/* TABS */}
+                <View style={{ flexDirection: 'row', marginBottom: 24, backgroundColor: '#F3F4F6', borderRadius: 12, padding: 4, width: '100%' }}>
+                    {availableMethods.map(renderTab)}
                 </View>
 
                 {/* CONTENT */}
