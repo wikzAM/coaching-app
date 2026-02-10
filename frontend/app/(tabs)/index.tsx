@@ -3,11 +3,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { ScrollView, Text, TouchableOpacity, StyleSheet, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, StyleSheet, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { useRouter } from 'expo-router';
+import { useCoach } from '@/lib/coach-context'; // <--- IMPORT HOOK
 
 const StatItem = ({ label, value, hasBorder = true }: { label: string, value: string, hasBorder?: boolean }) => (
   <>
@@ -23,22 +24,26 @@ const Rule = ({ className = 'bg-foreground' }: { className?: string }) => (
   <View className={`h-[1px] w-full ${className}`} />
 );
 
-// ── DATA ──
-const COACHES = [
-  { id: 1, name: 'Atlas', specialty: 'Fitness', unread: 3, avatar: 'A', sessions: 42, streak: 12, accent: 'bg-primary', textAccent: 'text-primary', hex: '#7869B0', hasReminder: true },
-  { id: 2, name: 'Sage', specialty: 'Learning', unread: 0, avatar: 'S', sessions: 31, streak: 5, accent: 'bg-success', textAccent: 'text-success', hex: '#4C9F70', hasReminder: false },
-  { id: 3, name: 'Echo', specialty: 'Career', unread: 1, avatar: 'E', sessions: 28, streak: 8, accent: 'bg-secondary', textAccent: 'text-secondary', hex: '#4A706E', hasReminder: true },
-  { id: 4, name: 'Flow', specialty: 'Wellness', unread: 0, avatar: 'F', sessions: 35, streak: 21, accent: 'bg-success', textAccent: 'text-success', hex: '#4C9F70', hasReminder: false },
-  { id: 5, name: 'Spark', specialty: 'Creative', unread: 2, avatar: 'S', sessions: 19, streak: 3, accent: 'bg-primary', textAccent: 'text-primary', hex: '#7869B0', hasReminder: true },
-];
-
 const CARD_WIDTH = 185;
 
 export default function HomeScreen() {
   const router = useRouter();
-  const CAROUSEL_DATA = [{ id: 'new', type: 'create' }, ...COACHES];
   const colorScheme = useColorScheme() ?? 'light';
   const primary = Colors[colorScheme].tint;
+
+  // 1. Get data from the hook
+  const { coaches, isLoading } = useCoach();
+
+  // 2. Merge "Create New" card with real coach data
+  const CAROUSEL_DATA = [{ id: 'new', type: 'create' }, ...coaches];
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 justify-center items-center bg-background">
+        <ActivityIndicator size="large" color={primary} />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-background">
@@ -66,7 +71,8 @@ export default function HomeScreen() {
           </View>
 
           <View className="flex-row py-3 pb-4 items-stretch">
-            <StatItem label="Coaches" value="5" />
+            {/* 3. Use dynamic length for stats */}
+            <StatItem label="Coaches" value={coaches.length.toString()} />
             <StatItem label="Sessions" value="155" />
             <StatItem label="This Week" value="12" hasBorder={false} />
           </View>
@@ -85,10 +91,15 @@ export default function HomeScreen() {
               <Text className="text-[10px] font-bold text-secondary tracking-widest uppercase">Daily</Text>
             </TouchableOpacity>
 
-            {COACHES.map((coach) => (
+            {/* 4. Map over real coaches data */}
+            {coaches.map((coach) => (
               <TouchableOpacity
                 key={coach.id}
                 className="mr-5 items-center"
+                onPress={() => router.push({
+                    pathname: "/chat/[id]",
+                    params: { id: coach.id.toString(), name: coach.name }
+                })}
               >
                 <View className={`w-[68px] h-[68px] rounded-full justify-center items-center mb-1.5 border-[2px] ${coach.hasReminder ? 'border-primary' : 'border-foreground/10'} bg-surface`}>
                   <View className="w-[58px] h-[58px] rounded-full bg-foreground justify-center items-center border-[2px] border-background">
@@ -121,7 +132,11 @@ export default function HomeScreen() {
             renderItem={(item: any) => {
               if (item.type === 'create') {
                 return (
-                  <TouchableOpacity className="border-2 border-dashed border-secondary rounded-3xl justify-center items-center bg-surface" style={{ width: CARD_WIDTH, height: 260 }}>
+                  <TouchableOpacity 
+                    className="border-2 border-dashed border-secondary rounded-3xl justify-center items-center bg-surface" 
+                    style={{ width: CARD_WIDTH, height: 260 }}
+                    onPress={() => router.push('/create-coach')} 
+                  >
                     <View className="w-11 h-11 rounded-full border-[1.5px] border-secondary justify-center items-center mb-2.5">
                       <Ionicons name="add" size={22} className="text-secondary" />
                     </View>

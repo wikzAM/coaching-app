@@ -392,3 +392,8 @@ verify_jwt = true
 entrypoint = "./functions/coach-model/coach.ts"
 import_map = "./deno.json"  # <--- Add this line
 verify_jwt = true
+
+[functions.diagnostic-mcqs]
+entrypoint = "./functions/diagnostics/diagnostic-mcqs.ts"
+import_map = "./deno.json"  # <--- Add this line
+verify_jwt = true

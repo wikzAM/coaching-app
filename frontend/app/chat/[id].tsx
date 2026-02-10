@@ -23,7 +23,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useKeyboardHandler } from 'react-native-keyboard-controller';
 
-// High-tension spring for that "expensive" UI feel
+import { supabase } from '@/lib/supabase';
+
 const SNAPPY_SPRING = {
     stiffness: 600,
     damping: 35,
@@ -40,6 +41,50 @@ export default function ChatScreen() {
         { id: '1', text: `Hi Monish! I'm ${name}. How can I support your goals today?`, sender: 'bot' },
         { id: '2', text: `I can help you break down complex tasks or just listen.`, sender: 'bot' },
     ]);
+
+    const [isTyping, setIsTyping] = useState(false)
+
+    const sendMessage = useCallback(async () => {
+        if (inputText.trim() === '' || isTyping) return;
+
+        const userMsgText = inputText.trim();
+        const userMsgId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+        // 1. Update UI immediately for snappiness
+        setMessages(prev => [...prev, { id: userMsgId, text: userMsgText, sender: 'user' }]);
+        setInputText('');
+        setIsTyping(true); // Show typing indicator
+
+        try {
+            // 2. Call your Supabase Edge Function
+            // This matches the 'general-chat' folder name in your backend
+            const { data, error } = await supabase.functions.invoke('general-chat', {
+                body: {
+                    chat: userMsgText,
+                    coachID: id // 'id' from params maps to backend coachID
+                }
+            });
+
+            if (error) throw error;
+
+            // 3. Add the bot's response to the chat
+            if (data?.reply) {
+                setMessages(prev => [...prev, {
+                    id: `${Date.now()}-bot`,
+                    text: data.reply,
+                    sender: 'bot'
+                }]);
+            }
+        } catch (err) {
+            console.error('Chat Error:', err);
+            // Optional: Add an error message to the chat UI here
+        } finally {
+            setIsTyping(false);
+            requestAnimationFrame(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+            });
+        }
+    }, [inputText, id, isTyping]);
 
     const flatListRef = useRef<FlatList>(null);
     const keyboardHeight = useSharedValue(0);
@@ -59,22 +104,22 @@ export default function ChatScreen() {
         height: Math.abs(keyboardHeight.value)
     }));
 
-    const sendMessage = useCallback(() => {
-        if (inputText.trim() === '') return;
+    // const sendMessage = useCallback(() => {
+    //     if (inputText.trim() === '') return;
 
-        const newMessage = {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            text: inputText.trim(),
-            sender: 'user',
-        };
+    //     const newMessage = {
+    //         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    //         text: inputText.trim(),
+    //         sender: 'user',
+    //     };
 
-        setMessages(prev => [...prev, newMessage]);
-        setInputText('');
+    //     setMessages(prev => [...prev, newMessage]);
+    //     setInputText('');
 
-        requestAnimationFrame(() => {
-            flatListRef.current?.scrollToEnd({ animated: true });
-        });
-    }, [inputText]);
+    //     requestAnimationFrame(() => {
+    //         flatListRef.current?.scrollToEnd({ animated: true });
+    //     });
+    // }, [inputText]);
 
     const renderMessage = useCallback(({ item, index }: { item: any; index: number }) => {
         const isUser = item.sender === 'user';
@@ -184,6 +229,16 @@ export default function ChatScreen() {
                     onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
                     renderItem={renderMessage}
                     removeClippedSubviews={true}
+                    ListFooterComponent={isTyping ? (
+                        <Animated.View
+                            entering={FadeInDown}
+                            className="items-start mb-4 px-2"
+                        >
+                            <View className="bg-surface/90 px-6 py-4 rounded-[32px] border-[2px] border-white/60 shadow-xl">
+                                <Text className="text-foreground/40 font-bold italic">Typing...</Text>
+                            </View>
+                        </Animated.View>
+                    ) : null}
                 />
 
                 {/* ── INPUT AREA ── */}

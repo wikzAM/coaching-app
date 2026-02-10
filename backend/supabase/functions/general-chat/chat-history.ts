@@ -20,7 +20,7 @@ export function updateBuffer(
   const key = `${userID}:${coachID}`;
   const buffer = chatBuffers.get(key) || [];
   
-  /* Add new messages, each message of user quiery and agent response takes 1 space
+  /* Add new messages, each message of user query and agent response takes 1 space
     so array is of length 30
   */
   buffer.push({ role: "user", text: userMsg });

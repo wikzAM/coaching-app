@@ -13,6 +13,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '../lib/supabase';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { CoachProvider } from '@/lib/coach-context';
 
 // Ensure AuthSession flow gets completed when the app opens after redirect
 WebBrowser.maybeCompleteAuthSession();
@@ -67,27 +68,35 @@ export default function RootLayout() {
       <KeyboardProvider>
         <View style={{ flex: 1 }} className={colorScheme === 'dark' ? 'dark' : ''}>
           <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack>
-              {/* Main App Navigation */}
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="login" options={{ headerShown: false }} />
-              <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
+            <CoachProvider>
+              <Stack>
+                {/* Main App Navigation */}
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="login" options={{ headerShown: false }} />
+                <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
 
-              {/* Auth Flow */}
-              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                {/* Chat Flow */}
+                <Stack.Screen
+                  name="chat/[id]"
+                  options={{
+                    headerShown: false,
+                    animation: 'slide_from_right'
+                  }}
+                />
 
-              {/* Chat Flow - Outside tabs for full screen */}
-              <Stack.Screen
-                name="chat/[id]"
-                options={{
-                  headerShown: false,
-                  animation: 'slide_from_right'
-                }}
-              />
+                {/* Create Coach screen */}
+                <Stack.Screen
+                  name="create-coach"
+                  options={{
+                    headerShown: false,
+                    animation: 'slide_from_right'
+                  }}
+                />
 
-              <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
-              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Settings' }} />
-            </Stack>
+                <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
+                <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Settings' }} />
+              </Stack>
+            </CoachProvider>
             <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
           </ThemeProvider>
         </View>

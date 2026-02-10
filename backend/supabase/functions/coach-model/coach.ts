@@ -9,18 +9,19 @@ Deno.serve( async(req) => {
 
     try {
         /* A coaches model and its personality are required. Description and custom instructions
-        are accepted but not required
+        are accepted but not required. User_ID to spawn coaches connected to user
         */
-        const {model, personality, description = "", custom = ""}: {
+        const {model, personality, description = "", custom = "", user_id}: {
             model: string;
             personality: string;
             description: string;
             custom: string;
+            user_id: string;
         } = await req.json();
 
-        if(!model || !personality) {
+        if(!model || !personality || !user_id) {
             return new Response(
-                JSON.stringify({ error: "model, personality and or description were not recieved"}), {status: 400, headers: {"Content-Type": "application/json"} }
+                JSON.stringify({ error: "model, personality, user_id, and or description were not recieved"}), {status: 400, headers: {"Content-Type": "application/json"} }
             );
         }
 
@@ -32,11 +33,23 @@ Deno.serve( async(req) => {
                 personality: personality,
                 description: description,
                 custom_instructions: custom
-            });
+            })
+            .select()
+            .single();
         
         if (error) {
-            throw new Error("Failed to insert coach into db in coach.ts");
+            throw new Error("Failed to insert coach into db in coach.ts" + error.message);
         }
+
+        // create the link in user_coaches
+        const { error: linkError } = await supabase
+            .from('user_coaches')
+            .insert({
+                user_id: user_id,
+                coach_id: data.coach_id
+            });
+
+        if (linkError) throw new Error("Failed to link coach to user: " + linkError.message);
 
         // verify that things went correctly
         return new Response(
