@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
 
     const { chat: userChatMsg, coachID } = await req.json();
 
-    const recentHistory = getBuffer(userUUID, coachID);
+    const recentHistory = await getBuffer(userUUID, coachID);
     
     // creating the vector
     const vector = await generateVector(userChatMsg);

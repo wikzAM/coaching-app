@@ -14,28 +14,66 @@ const genAI = new GoogleGenAI({
   apiKey: apiKey
 });
 
-export async function summarizeMessages(messages: string) {
-
-    const response = await genAI.models.generateContent({
-        model: "gemini-2.5-pro",
-        //Update instructions later. Assume it returns its bullet points seperated by "\n"
-        contents: `Analyze the following 10-message exchange between an AI coach and a user. 
-        Provide a concise summary using a maximum of 4 bullet points (fewer is preferred if the context allows). 
-        Group each user query with its corresponding agent resolution to preserve the 'challenge-and-solution' logic. 
-        Focus exclusively on information critical for future sessions: specific goals mentioned, progress made, 
-        obstacles identified, and any agreed-upon next steps. Avoid fluff; prioritize actionable data that informs 
-        how the coach should interact with the user moving forward. 
-        
-        Output Format Requirement: Your output must contain only the text of the points themselves. Do not use 
-        symbols (like -, *, or •), numbers, or introductory text. Separate each point using only a newline (\n) 
-        character.
-        
-        Here is the convesation:\n${messages}`
-    });
+// move onto next model if the current one returned an error
+function isRateLimitError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return false;
     
-    /* assuming that response always returns a text. Need to handle cases where gemini doesnt return text.
-    For example if the model runs out of credits as gemini pro is expensive*/
-    const toVectorize = response.text!.split("\n");
-  return toVectorize;
-  //Returns an array of bullet points to be vectorized in vector_embed.ts
+    const err = error as { status?: number; message?: string };
+    
+    return (
+        err.status === 429 ||
+        (err.message?.includes('quota') ?? false) ||
+        (err.message?.includes('rate limit') ?? false) ||
+        (err.message?.includes('RESOURCE_EXHAUSTED') ?? false)
+    );
+}
+
+export async function summarizeMessages(messages: string) {
+// backup models to switch to when gemini pro runs out
+    const models = [
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite"
+    ];
+    
+    // summarizing prompt
+    const prompt = `Analyze the following 10-message exchange between an AI coach and a user. 
+    Provide a concise summary using a maximum of 4 bullet points (fewer is preferred if the context allows). 
+    Group each user query with its corresponding agent resolution to preserve the 'challenge-and-solution' logic. 
+    Focus exclusively on information critical for future sessions: specific goals mentioned, progress made, 
+    obstacles identified, and any agreed-upon next steps. Avoid fluff; prioritize actionable data that informs 
+    how the coach should interact with the user moving forward. 
+    
+    Output Format Requirement: Your output must contain only the text of the points themselves. Do not use 
+    symbols (like -, *, or •), numbers, or introductory text. Separate each point using only a newline (\n) 
+    character.
+    
+    Here is the conversation:\n${messages}`;
+
+    for (let i = 0; i < models.length; i++) {
+        try {
+            const response = await genAI.models.generateContent({
+                model: models[i],
+                contents: prompt
+            });
+            
+            const toVectorize = response.text!.split("\n");
+            return toVectorize;
+            //Returns an array of bullet points to be vectorized in vector_embed.ts
+            
+        } catch (error: unknown) {
+            // Check if it's a rate limit error
+            const isRateLimit = isRateLimitError(error);
+            
+            if (isRateLimit && i < models.length - 1) {
+                console.warn(`Rate limit reached for ${models[i]}, trying ${models[i + 1]}...`);
+                continue; // Try next model
+            }
+            
+            // If it's the last model or not a rate limit error, throw
+            throw error;
+        }
+    }
+    
+    throw new Error('All models exhausted');
 }
