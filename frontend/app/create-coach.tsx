@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -7,7 +7,9 @@ import {
   ScrollView, 
   ActivityIndicator, 
   Pressable,
-  Alert
+  Alert,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,11 +21,8 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 // --- CONSTANTS ---
-// (Keep your MODELS and PERSONALITIES arrays here same as before)
-const TEST_USER_ID = "099cc5d8-2318-40e7-b1f8-334a4146a014"; 
-
 const MODELS = [
-  { id: 'GROW', name: 'The Strategist (GROW)', desc: 'Goal • Reality • Options • Will', long: 'Moves you from "stuck" to "action" in 4 steps.', icon: 'compass-outline' },
+  { id: 'GROW', name: 'The Strategist (GROW)', desc: 'Goal • Reality • Options • Will', long: 'Moves you from "stuck" to "action".', icon: 'compass-outline' },
   { id: 'OSKAR', name: 'The Optimist (OSKAR)', desc: 'Outcome • Scaling • Know-how', long: 'Focuses on what is already working.', icon: 'sunny-outline' },
   { id: 'CIGAR', name: 'The Analyst (CIGAR)', desc: 'Reality • Gaps • Action', long: 'Ruthlessly identifies what is missing.', icon: 'analytics-outline' },
   { id: 'FUEL', name: 'The Executive (FUEL)', desc: 'Frame • Understand • Plan', long: 'Fast, direct, and professional.', icon: 'flash-outline' },
@@ -33,8 +32,8 @@ const MODELS = [
 const PERSONALITIES = [
   { id: 'Sage', name: 'The Sage', desc: 'Calm, metaphorical.', prompt: 'You are calm, reflective, and use metaphors.', emoji: '🧘‍♂️'},
   { id: 'Drill', name: 'Drill Sergeant', desc: 'High energy, strict.', prompt: 'You are high-energy and strict. No excuses.', emoji: '🪖'},
-  { id: 'Bestie', name: 'Supportive Bestie', desc: 'Empathetic, warm.', prompt: 'You are a supportive friend. Use emojis.', emoji: '✨'},
-  { id: 'Pro', name: 'The Professional', desc: 'Objective, dry.', prompt: 'You are strictly professional. No fluff.', emoji: '👔'},
+  { id: 'Bestie', name: 'Bestie', desc: 'Empathetic, warm.', prompt: 'You are a supportive friend. Use emojis.', emoji: '✨'},
+  { id: 'Pro', name: 'Professional', desc: 'Objective, dry.', prompt: 'You are strictly professional. No fluff.', emoji: '👔'},
 ];
 
 export default function CreateCoachScreen() {
@@ -46,6 +45,7 @@ export default function CreateCoachScreen() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [goal, setGoal] = useState('');
+  const [coachName, setCoachName] = useState(''); // New State for Name
   const [diagnostics, setDiagnostics] = useState<any[]>([]);
   const [mcqAnswers, setMcqAnswers] = useState<Record<number, string>>({});
   const [selectedModel, setSelectedModel] = useState(MODELS[0]);
@@ -76,6 +76,19 @@ export default function CreateCoachScreen() {
   const handleCreateCoach = async () => {
     setLoading(true);
     try {
+      // 1. Get Session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      // OPTIONAL: Uncomment to enforce login
+      /*
+      if (sessionError || !session) {
+        Alert.alert("Authentication Required", "You must be signed in to create a coach.");
+        setLoading(false);
+        return;
+      }
+      */
+
+      // 2. Prepare Data
       const diagnosticSummary = Object.entries(mcqAnswers)
         .map(([qId, ans]) => `Diagnostic Q${qId}: User selected "${ans}"`)
         .join('\n');
@@ -87,18 +100,28 @@ export default function CreateCoachScreen() {
         ${diagnosticSummary}
       `;
 
-      const { error } = await supabase.functions.invoke('coach-model', {
+      // 3. Determine Final Name (User input OR Auto-generated)
+      const defaultName = `${selectedModel.name.split(' ')[1]} ${selectedPersonality.name.replace('The ', '')}`;
+      const finalName = coachName.trim().length > 0 ? coachName.trim() : defaultName;
+
+      // 4. Send Request
+      const { error } = await supabase.functions.invoke('coach-creation', {
         body: {
           model: selectedModel.id,
           personality: selectedPersonality.id,
           description: `${selectedModel.name} with ${selectedPersonality.name} vibes.`,
           custom: fullCustomInstructions,
-          user_id: TEST_USER_ID 
+          coach_name: finalName // <--- PASSING THE NAME HERE
+        },
+        headers: {
+          Authorization: `Bearer ${session?.access_token || "dummy-token"}`
         }
       });
 
       if (error) throw error;
-        router.push('/'); 
+      
+      router.replace('/');
+      
     } catch (err: any) {
       Alert.alert("Creation Failed", err.message);
     } finally {
@@ -140,7 +163,6 @@ export default function CreateCoachScreen() {
   const renderStep2 = () => (
     <Animated.View entering={FadeInRight} exiting={FadeInLeft} className="flex-1">
       <View className="px-6 pt-10 pb-2 flex-row items-center">
-        {/* BACK BUTTON ADDED HERE */}
         <TouchableOpacity onPress={() => setStep(1)} className="mr-4 w-10 h-10 rounded-full bg-surface items-center justify-center border border-foreground/5">
           <Ionicons name="arrow-back" size={24} className="text-foreground" />
         </TouchableOpacity>
@@ -193,82 +215,142 @@ export default function CreateCoachScreen() {
     </Animated.View>
   );
 
-  // STEP 3
-  const renderStep3 = () => (
-    <Animated.View entering={FadeInRight} exiting={FadeInLeft} className="flex-1">
-      <View className="px-6 pt-10 pb-2 flex-row items-center">
-        {/* BACK BUTTON ADDED HERE */}
-        <TouchableOpacity onPress={() => setStep(2)} className="mr-4 w-10 h-10 rounded-full bg-surface items-center justify-center border border-foreground/5">
-          <Ionicons name="arrow-back" size={24} className="text-foreground" />
-        </TouchableOpacity>
-        <View>
-            <Text className="text-2xl font-black text-foreground">Final Polish</Text>
-            <Text className="text-secondary font-medium">Design your coach.</Text>
-        </View>
-      </View>
+  // STEP 3 - UPDATED
+  const renderStep3 = () => {
+    // Dynamic Title Logic: Use input name OR generated combination
+    const generatedName = `${selectedModel.name.split(' ')[1]} ${selectedPersonality.name.replace('The ', '')}`;
+    const displayTitle = coachName.trim().length > 0 ? coachName : generatedName;
+    
+    return (
+      <Animated.View entering={FadeInRight} exiting={FadeInLeft} className="flex-1">
+        
+        {/* HEADER & PREVIEW */}
+        <View className="px-6 pt-8 pb-4">
+          <View className="flex-row items-center mb-6">
+            <TouchableOpacity onPress={() => setStep(2)} className="mr-4 w-10 h-10 rounded-full bg-surface items-center justify-center border border-foreground/5">
+              <Ionicons name="arrow-back" size={24} className="text-foreground" />
+            </TouchableOpacity>
+            <View>
+              <Text className="text-secondary font-medium text-xs uppercase tracking-widest">Final Assembly</Text>
+              <Text className="text-2xl font-black text-foreground">Meet Your Coach</Text>
+            </View>
+          </View>
 
-      <ScrollView className="flex-1 pt-6" contentContainerStyle={{ paddingBottom: 140 }}>
-        {/* MODEL SELECTOR */}
-        <View className="mb-10">
-          <Text className="px-6 text-[10px] font-black text-secondary uppercase tracking-[2px] mb-4">The Framework</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 16 }}>
-            {MODELS.map((model) => {
-              const isActive = selectedModel.id === model.id;
-              return (
-                <TouchableOpacity
-                  key={model.id}
-                  onPress={() => setSelectedModel(model)}
-                  activeOpacity={0.9}
-                  className={`w-[260px] p-5 rounded-[28px] border-[2px] ${isActive ? 'bg-primary border-primary' : 'bg-surface border-foreground/5'}`}
-                >
-                  <View className="flex-row justify-between items-start mb-4">
-                    <View className={`w-10 h-10 rounded-full items-center justify-center ${isActive ? 'bg-white/20' : 'bg-secondary/10'}`}>
-                      <Ionicons name={model.icon as any} size={20} color={isActive ? 'white' : 'gray'} />
-                    </View>
-                    {isActive && <Ionicons name="checkmark-circle" size={24} color="white" />}
-                  </View>
-                  <Text className={`text-xl font-black mb-1 ${isActive ? 'text-white' : 'text-foreground'}`}>{model.name}</Text>
-                  <Text className={`text-sm leading-5 ${isActive ? 'text-white/90' : 'text-foreground/70'}`}>{model.long}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          {/* DYNAMIC PREVIEW CARD */}
+          <View className="bg-surface border border-foreground/5 p-5 rounded-3xl flex-row items-center shadow-sm">
+            <View className="w-16 h-16 rounded-2xl bg-primary/10 items-center justify-center mr-4">
+              <Text className="text-3xl">{selectedPersonality.emoji}</Text>
+            </View>
+            <View className="flex-1">
+              <Text className="text-lg font-black text-foreground" numberOfLines={1}>{displayTitle}</Text>
+              <Text className="text-secondary text-sm" numberOfLines={1}>{selectedModel.long}</Text>
+            </View>
+          </View>
         </View>
 
-        {/* PERSONALITY SELECTOR */}
-        <View>
-          <Text className="px-6 text-[10px] font-black text-secondary uppercase tracking-[2px] mb-4">The Vibe</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}>
-            {PERSONALITIES.map((persona) => {
-              const isActive = selectedPersonality.id === persona.id;
-              return (
-                <Pressable
-                  key={persona.id}
-                  onPress={() => setSelectedPersonality(persona)}
-                  className={`w-[140px] h-[160px] rounded-[24px] items-center justify-center border-[2px] active:opacity-70 ${isActive ? 'bg-surface border-primary shadow-xl shadow-primary/20' : 'bg-surface border-foreground/5'}`}
-                >
-                  <Text className="text-4xl mb-3">{persona.emoji}</Text>
-                  <Text className={`text-sm font-black text-center mb-1 ${isActive ? 'text-primary' : 'text-foreground'}`}>{persona.name}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-      </ScrollView>
+        <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 140 }}>
+          
+          {/* SECTION 1: THE BRAIN (Horizontal Scroll) */}
+          <View className="mb-8">
+            <Text className="px-6 text-xs font-black text-secondary uppercase tracking-[2px] mb-4 mt-2">1. Choose The Brain</Text>
+            <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}
+            >
+                {MODELS.map((model) => {
+                const isActive = selectedModel.id === model.id;
+                return (
+                    <Pressable
+                        key={model.id}
+                        onPress={() => setSelectedModel(model)}
+                        className={`w-72 p-5 rounded-[24px] border-[2px] ${isActive ? 'bg-primary/5 border-primary' : 'bg-surface border-foreground/5'}`}
+                    >
+                        <View className="flex-row justify-between items-start mb-3">
+                            <View className={`w-10 h-10 rounded-full items-center justify-center ${isActive ? 'bg-primary' : 'bg-secondary/10'}`}>
+                                <Ionicons name={model.icon as any} size={20} color={isActive ? 'white' : 'gray'} />
+                            </View>
+                            {isActive && <Ionicons name="checkmark-circle" size={24} color={primary} />}
+                        </View>
+                        <Text className={`font-bold text-lg mb-1 ${isActive ? 'text-primary' : 'text-foreground'}`}>{model.name.split('(')[0].trim()}</Text>
+                        <Text className="text-secondary text-sm leading-5">{model.desc}</Text>
+                    </Pressable>
+                );
+                })}
+            </ScrollView>
+          </View>
 
-      {/* FOOTER */}
-      <View className="absolute bottom-0 left-0 right-0 p-6 bg-background/90 blur-lg border-t border-foreground/5">
-        <TouchableOpacity onPress={handleCreateCoach} disabled={loading} className="bg-foreground h-14 rounded-full flex-row items-center justify-center">
-          {loading ? <ActivityIndicator color={colorScheme === 'dark' ? 'black' : 'white'} /> : (
-            <>
-              <Text className="text-background font-black text-lg tracking-widest uppercase mr-2">Hire Coach</Text>
-              <Ionicons name="checkmark" size={20} color={colorScheme === 'dark' ? 'black' : 'white'} />
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-    </Animated.View>
-  );
+          {/* SECTION 2: THE VIBE (Horizontal Scroll) */}
+          <View className="mb-8">
+            <Text className="px-6 text-xs font-black text-secondary uppercase tracking-[2px] mb-4">2. Choose The Vibe</Text>
+            <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}
+            >
+                {PERSONALITIES.map((persona) => {
+                const isActive = selectedPersonality.id === persona.id;
+                return (
+                    <Pressable
+                        key={persona.id}
+                        onPress={() => setSelectedPersonality(persona)}
+                        className={`w-40 p-5 rounded-[24px] border-[2px] items-center ${isActive ? 'bg-primary/5 border-primary' : 'bg-surface border-foreground/5'}`}
+                    >
+                        <Text className="text-4xl mb-3">{persona.emoji}</Text>
+                        <Text className={`font-bold text-center ${isActive ? 'text-primary' : 'text-foreground'}`}>{persona.name}</Text>
+                    </Pressable>
+                );
+                })}
+            </ScrollView>
+          </View>
+
+          {/* SECTION 3: NAME INPUT */}
+          <View className="px-6 mb-8">
+            <Text className="text-xs font-black text-secondary uppercase tracking-[2px] mb-4">3. Name Your Coach</Text>
+            <View className="bg-surface border-[2px] border-foreground/10 rounded-2xl px-4 py-3 flex-row items-center">
+                <Ionicons name="pricetag-outline" size={20} className="text-secondary mr-3" />
+                <TextInput
+                    value={coachName}
+                    onChangeText={setCoachName}
+                    placeholder={generatedName}
+                    placeholderTextColor="#9CA3AF"
+                    className="flex-1 font-bold text-lg text-foreground"
+                />
+                {coachName.length > 0 && (
+                    <TouchableOpacity onPress={() => setCoachName('')}>
+                        <Ionicons name="close-circle" size={20} className="text-secondary" />
+                    </TouchableOpacity>
+                )}
+            </View>
+            <Text className="text-xs text-secondary mt-2 pl-1">Leave empty to use the default name.</Text>
+          </View>
+
+        </ScrollView>
+
+        {/* FOOTER */}
+        <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+            keyboardVerticalOffset={Platform.OS === 'ios' ? -20 : 0}
+            className="absolute bottom-0 left-0 right-0"
+        >
+            <View className="p-6 bg-background/90 blur-lg border-t border-foreground/5">
+            <TouchableOpacity 
+                onPress={handleCreateCoach} 
+                disabled={loading} 
+                className="bg-foreground h-14 rounded-full flex-row items-center justify-center shadow-lg"
+            >
+                {loading ? <ActivityIndicator color={colorScheme === 'dark' ? 'black' : 'white'} /> : (
+                <>
+                    <Text className="text-background font-black text-lg tracking-widest uppercase mr-2">Initialize Coach</Text>
+                    <Ionicons name="arrow-forward" size={20} color={colorScheme === 'dark' ? 'black' : 'white'} />
+                </>
+                )}
+            </TouchableOpacity>
+            </View>
+        </KeyboardAvoidingView>
+      </Animated.View>
+    );
+  };
 
   return (
     <View className="flex-1 bg-background">

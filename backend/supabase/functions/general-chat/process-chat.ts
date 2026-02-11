@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
 
     // 7. Gemini Generation
     const chat = genAI.chats.create({
-      model: "gemini-2.5-pro",
+      model: "gemini-2.5-flash",
       config: {
         systemInstruction: `${CORE_SYSTEM_PROMPT}\n\nCOACH PROFILE:\n${coachContext}`,
       },
