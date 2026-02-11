@@ -18,7 +18,7 @@
 /// <reference lib="deno.window" />
 
 import { supabase } from "../../supabase-setup.ts";
-import { createRemoteJWKSet, jwtVerify } from "npm:jose";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const FIREBASE_PROJECT_ID = Deno.env.get("FIREBASE_PROJECT_ID")!;

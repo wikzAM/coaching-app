@@ -24,34 +24,35 @@ interface CoachContextType {
 const CoachContext = createContext<CoachContextType | undefined>(undefined);
 
 export function CoachProvider({ children }: { children: React.ReactNode }) {
+  // State for list of coaches and loading indicator
   const [coaches, setCoaches] = useState<Coach[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchCoaches = async () => {
     try {
+      // 1. Get current session (user must be logged in)
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
-          setCoaches([]);
-          setIsLoading(false);
-          return;
-      // --- DEV MODE FETCH ---
-      // We explicitly fetch coaches created by your Test User ID
-      // so you can see them without needing full Auth login flow yet.
-      
-      const { data, error } = await supabase
-        .from('coaches')
-        .select('*')
-        .eq('created_by', TEST_USER_ID) 
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching coaches:', error);
+        setCoaches([]);
+        setIsLoading(false);
         return;
       }
+      // 2. DEV MODE: Fetch coaches created by TEST_USER_ID for development/testing
+      const { data: coachData, error: coachError } = await supabase
+        .from('coaches')
+        .select('*')
+        .eq('created_by', TEST_USER_ID)
+        .order('created_at', { ascending: false });
+      if (coachError) {
+        // Partner: Log error if fetching test coaches fails
+        console.error('Error fetching coaches:', coachError);
+        setCoaches([]);
+        setIsLoading(false);
+        return;
+      }
+      // 3. Fetch ONLY the coaches this user has hired (production logic)
       const user = session.user;
-
-      // 2. Fetch ONLY the coaches this user has hired
-      const { data, error } = await supabase
+      const { data: userCoachData, error: userCoachError } = await supabase
         .from('user_coaches')
         .select(`
           coach_id,
@@ -65,33 +66,28 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
           )
         `)
         .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      // 3. Format database data for your UI
-      const formatted = data.map((item: any) => ({
+      if (userCoachError) {
+        // Partner: Log error if fetching user's hired coaches fails
+        console.error('Error fetching user coaches:', userCoachError);
+        setCoaches([]);
+        setIsLoading(false);
+        return;
+      }
+      // 4. Format database data for UI (matches Coach interface)
+      const formattedCoaches: Coach[] = (userCoachData ?? []).map((item: any) => ({
         id: item.coaches.coach_id,
         name: item.coaches.name || item.coaches.training_model || 'Coach',
-        specialty: item.coaches.personality || 'Generalist',
+        training_model: item.coaches.training_model || 'General',
+        personality: item.coaches.personality || 'Standard',
         avatar: (item.coaches.name?.[0] || item.coaches.training_model?.[0] || 'C').toUpperCase(),
-        model: item.coaches.training_model,
       }));
-
-      setCoaches(formatted);
-      if (data) {
-        // 3. Map Database fields to UI fields
-        const formattedCoaches = data.map((item: any) => ({
-          id: item.coach_id,
-          name: item.name || 'Coach',
-          training_model: item.training_model || 'General',
-          personality: item.personality || 'Standard',
-          avatar: (item.name || 'C').charAt(0).toUpperCase(), // Generate Avatar letter
-        }));
-        setCoaches(formattedCoaches);
-      }
+      setCoaches(formattedCoaches);
     } catch (err) {
+      // Partner: Log unexpected errors
       console.error('Unexpected error:', err);
+      setCoaches([]);
     } finally {
+      // Always clear loading state
       setIsLoading(false);
     }
   };
@@ -99,7 +95,7 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     fetchCoaches();
 
-    // Re-fetch when auth state changes (login/logout)
+    // Partner: Re-fetch coaches when auth state changes (login/logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         fetchCoaches();
@@ -109,6 +105,7 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    // Partner: Clean up subscription on unmount
     return () => subscription.unsubscribe();
   }, []);
 

@@ -22,7 +22,7 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-export default function RootLayout() {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   const colorScheme = useColorScheme();
   const [session, setSession] = useState<Session | null>(null);
   const [initialized, setInitialized] = useState(false);
@@ -74,7 +74,6 @@ export default function RootLayout() {
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="login" options={{ headerShown: false }} />
                 <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
-
                 {/* Chat Flow */}
                 <Stack.Screen
                   name="chat/[id]"
@@ -83,7 +82,6 @@ export default function RootLayout() {
                     animation: 'slide_from_right'
                   }}
                 />
-
                 {/* Create Coach screen */}
                 <Stack.Screen
                   name="create-coach"
@@ -92,11 +90,10 @@ export default function RootLayout() {
                     animation: 'slide_from_right'
                   }}
                 />
-
                 <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Settings' }} />
               </Stack>
+              {children}
             </CoachProvider>
-            <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
           </ThemeProvider>
         </View>
       </KeyboardProvider>
