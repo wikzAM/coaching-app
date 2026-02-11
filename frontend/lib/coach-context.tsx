@@ -1,13 +1,17 @@
+// lib/coach-context.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from './supabase';
 
-// 1. Define what a "Coach" looks like in your app
+// 1. DEV MODE CONSTANT (Matches your backend)
+const TEST_USER_ID = "099cc5d8-2318-40e7-b1f8-334a4146a014";
+
+// 2. Define the shape of a Coach (Matches your Database & UI)
 export interface Coach {
   id: string;
   name: string;
-  specialty: string;
-  avatar: string;
-  model: string; 
+  training_model: string;
+  personality: string;
+  avatar: string; // Helper for UI
 }
 
 interface CoachContextType {
@@ -30,6 +34,19 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
           setCoaches([]);
           setIsLoading(false);
           return;
+      // --- DEV MODE FETCH ---
+      // We explicitly fetch coaches created by your Test User ID
+      // so you can see them without needing full Auth login flow yet.
+      
+      const { data, error } = await supabase
+        .from('coaches')
+        .select('*')
+        .eq('created_by', TEST_USER_ID) 
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching coaches:', error);
+        return;
       }
       const user = session.user;
 
@@ -61,8 +78,19 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
       }));
 
       setCoaches(formatted);
+      if (data) {
+        // 3. Map Database fields to UI fields
+        const formattedCoaches = data.map((item: any) => ({
+          id: item.coach_id,
+          name: item.name || 'Coach',
+          training_model: item.training_model || 'General',
+          personality: item.personality || 'Standard',
+          avatar: (item.name || 'C').charAt(0).toUpperCase(), // Generate Avatar letter
+        }));
+        setCoaches(formattedCoaches);
+      }
     } catch (err) {
-      console.error('Error fetching coaches:', err);
+      console.error('Unexpected error:', err);
     } finally {
       setIsLoading(false);
     }
@@ -84,7 +112,7 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Helper to check if a coach is already hired
+  // Helper to check if a coach is already in the list
   const hasCoach = (id: string) => coaches.some(c => c.id === id);
 
   return (
