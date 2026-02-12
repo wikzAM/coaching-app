@@ -29,6 +29,19 @@ if (!apiKey) throw new Error("GEMINI_API is not set");
 
 const genAI = new GoogleGenAI({ apiKey });
 
+function isRateLimitError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return false;
+    
+    const err = error as { status?: number; message?: string };
+    
+    return (
+        err.status === 429 ||
+        (err.message?.includes('quota') ?? false) ||
+        (err.message?.includes('rate limit') ?? false) ||
+        (err.message?.includes('RESOURCE_EXHAUSTED') ?? false)
+    );
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -93,29 +106,55 @@ Deno.serve(async (req) => {
       Instructions: ${coach.custom_instructions || "None"}
     `;
 
-    // Call to gemini
-    const chat = genAI.chats.create({
-      model: "gemini-2.5-flash",
-      config: {
-        systemInstruction: `${CORE_SYSTEM_PROMPT}\n\nCOACH PROFILE:\n${coachContext}`,
-      },
-      history: [
-        createMsg("user", `Long-term memory context:\n${longTermMems}`),
-        createMsg("model", "Acknowledged."),
-        ...formatRecentHistory(recentHistory),
-      ],
-    });
+    const models = [
+      "gemini-2.5-flash",
+      "gemini-1.5-flash",
+      "gemini-1.5-pro"
+    ];
 
-    const result = await chat.sendMessage({ message: userChatMsg });
+    let agentChatMsg: string | null = null;
 
-    const agentChatMsg = result.text;
+    // Call to gemini with fallback models
+    for (let i = 0; i < models.length; i++) {
+      try {
+        const chat = genAI.chats.create({
+          model: models[i],
+          config: {
+            systemInstruction: `${CORE_SYSTEM_PROMPT}\n\nCOACH PROFILE:\n${coachContext}`,
+          },
+          history: [
+            createMsg("user", `Long-term memory context:\n${longTermMems}`),
+            createMsg("model", "Acknowledged."),
+            ...formatRecentHistory(recentHistory),
+          ],
+        });
+
+        const result = await chat.sendMessage({ message: userChatMsg });
+        agentChatMsg = result.text ?? null;
+        
+        console.log(`Successfully used model: ${models[i]}`);
+        break; // Success, exit loop
+        
+      } catch (error: unknown) {
+        // Check if it's a rate limit error
+        const isRateLimit = isRateLimitError(error);
+        
+        if (isRateLimit && i < models.length - 1) {
+          console.warn(`Rate limit reached for ${models[i]}, trying ${models[i + 1]}...`);
+          continue; // Try next model
+        }
+        
+        // If it's the last model or not a rate limit error, throw
+        throw error;
+      }
+    }
 
     if (!agentChatMsg) {
       throw new Error('Empty response from AI');
     }
 
     // update the local buffer
-    updateBuffer(userUUID, coachID, userChatMsg, agentChatMsg);
+    await updateBuffer(userUUID, coachID, userChatMsg, agentChatMsg);
 
     return new Response(
       JSON.stringify({ reply: agentChatMsg }),
