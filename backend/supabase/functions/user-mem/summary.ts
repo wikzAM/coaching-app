@@ -4,8 +4,10 @@ bullet points and stores each bullet point in an array.
 */
 
 import { GoogleGenAI } from "google-gen";
-import { isRateLimitError } from "../general-chat/rate-limit-err.ts";
-
+import { isRateLimitError } from "../general-chat/helper-funcs/rate-limit-err.ts";
+import { models
+  
+ } from "../models-to-quiery.ts";
 const apiKey = Deno.env.get("GEMINI_API");
 if (!apiKey) {
   throw new Error("GEMINI_API is not set");
@@ -16,15 +18,6 @@ const genAI = new GoogleGenAI({
 });
 
 export async function summarizeMessages(messages: string) {
-// backup models to switch to when gemini pro runs out
-    const models = [
-      "gemini-2.5-pro",
-      "gemini-3-flash-preview",
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-2.0-flash-001",
-      "gemini-2.5-flash-lite"
-    ];
     
     // summarizing prompt
     const prompt = `Analyze the following 10-message exchange between an AI coach and a user. 
