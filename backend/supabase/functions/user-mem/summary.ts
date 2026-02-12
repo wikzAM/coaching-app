@@ -4,6 +4,7 @@ bullet points and stores each bullet point in an array.
 */
 
 import { GoogleGenAI } from "google-gen";
+import { isRateLimitError } from "../general-chat/rate-limit-err.ts";
 
 const apiKey = Deno.env.get("GEMINI_API");
 if (!apiKey) {
@@ -13,34 +14,6 @@ if (!apiKey) {
 const genAI = new GoogleGenAI({
   apiKey: apiKey
 });
-
-// move onto next model if the current one returned an error
-function isRateLimitError(error: unknown): boolean {
-    if (!error || typeof error !== 'object') return false;
-    
-    // Handle both direct error and nested error object
-    const err = error as { 
-        status?: number | string; 
-        message?: string;
-        error?: {
-            status?: number | string;
-            code?: number;
-            message?: string;
-        }
-    };
-    
-    // Check nested error first (Gemini's format)
-    const status = err.error?.status || err.error?.code || err.status;
-    const message = err.error?.message || err.message;
-    
-    return (
-        status === 429 ||
-        status === "RESOURCE_EXHAUSTED" ||
-        (message?.includes('quota') ?? false) ||
-        (message?.includes('rate limit') ?? false) ||
-        (message?.includes('RESOURCE_EXHAUSTED') ?? false)
-    );
-}
 
 export async function summarizeMessages(messages: string) {
 // backup models to switch to when gemini pro runs out

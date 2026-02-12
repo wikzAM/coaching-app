@@ -4,7 +4,7 @@ import { GoogleGenAI } from "google-gen";
 import { CORE_SYSTEM_PROMPT } from "../../supabase-setup.ts";
 import { getBuffer, updateBuffer } from "./chat-history.ts";
 import { formatRecentHistory, createMsg } from "./format-recent-history.ts";
-
+import { isRateLimitError } from "./rate-limit-err.ts";
 // We create types corresponding to how data is organized on supabase
 interface MemoryRow {
   memory_id: string;
@@ -28,33 +28,6 @@ const apiKey = Deno.env.get("GEMINI_API");
 if (!apiKey) throw new Error("GEMINI_API is not set");
 
 const genAI = new GoogleGenAI({ apiKey });
-
-function isRateLimitError(error: unknown): boolean {
-    if (!error || typeof error !== 'object') return false;
-    
-    // Handle both direct error and nested error object
-    const err = error as { 
-        status?: number | string; 
-        message?: string;
-        error?: {
-            status?: number | string;
-            code?: number;
-            message?: string;
-        }
-    };
-    
-    // Check nested error first (Gemini's format)
-    const status = err.error?.status || err.error?.code || err.status;
-    const message = err.error?.message || err.message;
-    
-    return (
-        status === 429 ||
-        status === "RESOURCE_EXHAUSTED" ||
-        (message?.includes('quota') ?? false) ||
-        (message?.includes('rate limit') ?? false) ||
-        (message?.includes('RESOURCE_EXHAUSTED') ?? false)
-    );
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
