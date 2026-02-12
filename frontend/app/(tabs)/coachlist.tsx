@@ -1,22 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useCallback } from 'react';
-// ── ADDED Platform TO THIS IMPORT ──
-import { FlatList, Text, TouchableOpacity, View, StyleSheet, Platform } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { FlatList, Text, TouchableOpacity, View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
+import { supabase } from '@/lib/supabase'; // Ensure this path matches your project structure
 
-const COACHES = [
-  { id: 1, name: 'Atlas', specialty: 'Fitness', unread: 3, avatar: 'A', accent: 'bg-primary' },
-  { id: 2, name: 'Sage', specialty: 'Learning', unread: 0, avatar: 'S', accent: 'bg-success' },
-  { id: 3, name: 'Echo', specialty: 'Career', unread: 1, avatar: 'E', accent: 'bg-secondary' },
-  { id: 4, name: 'Flow', specialty: 'Wellness', unread: 0, avatar: 'F', accent: 'bg-success' },
-  { id: 5, name: 'Spark', specialty: 'Creative', unread: 2, avatar: 'S', accent: 'bg-primary' },
-];
+// Define the shape of a Coach from Supabase
+interface Coach {
+  coach_id: string;
+  name: string | null;
+  description: string | null;
+  // We add these locally for UI styling
+  avatar: string;
+  accent: string;
+  specialty: string;
+}
 
 const SNAPPY_SPRING = {
   stiffness: 600,
@@ -24,12 +27,54 @@ const SNAPPY_SPRING = {
   mass: 0.5,
 };
 
+// Accents to cycle through for visual variety
+const ACCENTS = ['bg-primary', 'bg-success', 'bg-secondary'];
+
 export default function CoachListScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const primaryColor = Colors[colorScheme].tint;
+  
+  const [coaches, setCoaches] = useState<Coach[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const renderCoachItem = useCallback(({ item }: { item: typeof COACHES[0] }) => (
+  useEffect(() => {
+    fetchCoaches();
+  }, []);
+
+  const fetchCoaches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('coaches')
+        .select('*');
+
+      if (error) {
+        console.error('Error fetching coaches:', error);
+      } else if (data) {
+        // Map Supabase data to UI required format
+        const formattedCoaches = data.map((coach: any, index: number) => ({
+          ...coach,
+          // If name is missing, fallback to 'Coach'
+          name: coach.name || 'Coach', 
+          // Use first letter of name for avatar
+          avatar: (coach.name || 'C').charAt(0).toUpperCase(),
+          // Assign a random color from our list
+          accent: ACCENTS[index % ACCENTS.length],
+          // Use description as specialty, truncate if too long
+          specialty: coach.description ? 
+            (coach.description.length > 20 ? coach.description.substring(0, 20) + '...' : coach.description) 
+            : 'General Coaching'
+        }));
+        setCoaches(formattedCoaches);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderCoachItem = useCallback(({ item }: { item: Coach }) => (
     <Animated.View
       entering={FadeInDown.springify().stiffness(SNAPPY_SPRING.stiffness).damping(SNAPPY_SPRING.damping)}
       layout={Layout.springify().stiffness(SNAPPY_SPRING.stiffness)}
@@ -39,7 +84,8 @@ export default function CoachListScreen() {
         className="mb-4 mx-6"
         onPress={() => router.push({
           pathname: "/chat/[id]",
-          params: { id: item.id.toString(), name: item.name }
+          // Pass the actual UUID from Supabase
+          params: { id: item.coach_id, name: item.name ?? "Coach" } 
         })}
       >
         <View className="rounded-[28px] overflow-hidden border-[2px] border-white/60 shadow-xl">
@@ -62,12 +108,7 @@ export default function CoachListScreen() {
               </View>
             </View>
 
-            {item.unread > 0 && (
-              <View className={`${item.accent} rounded-full min-w-[24px] h-6 px-1.5 justify-center items-center mr-2 shadow-sm border-[1.5px] border-white/30`}>
-                <Text className="text-[10px] font-black text-background">{item.unread}</Text>
-              </View>
-            )}
-
+            {/* Unread badge removed since we don't have unread count in DB yet */}
             <Ionicons name="chevron-forward" size={20} className="text-foreground/20" />
           </View>
         </View>
@@ -96,17 +137,32 @@ export default function CoachListScreen() {
             MY COACHES
           </Text>
 
-          <View className="w-11" />
+          {/* Refresh Button */}
+          <TouchableOpacity 
+            onPress={fetchCoaches}
+            className="w-11 h-11 rounded-full bg-surface items-center justify-center border-[2px] border-foreground/10 shadow-sm"
+          >
+             <Ionicons name="refresh" size={20} className="text-foreground" />
+          </TouchableOpacity>
         </View>
 
-        <FlatList
-          data={COACHES}
-          keyExtractor={item => item.id.toString()}
-          renderItem={renderCoachItem}
-          contentContainerStyle={{ paddingBottom: 100 }}
-          showsVerticalScrollIndicator={false}
-          removeClippedSubviews={Platform.OS === 'android'}
-        />
+        {loading ? (
+          <View className="flex-1 justify-center items-center">
+            <ActivityIndicator size="large" color={primaryColor} />
+          </View>
+        ) : (
+          <FlatList
+            data={coaches}
+            keyExtractor={item => item.coach_id}
+            renderItem={renderCoachItem}
+            contentContainerStyle={{ paddingBottom: 100 }}
+            showsVerticalScrollIndicator={false}
+            removeClippedSubviews={Platform.OS === 'android'}
+            ListEmptyComponent={
+              <Text className="text-center text-foreground/50 mt-10">No coaches found. Check your database!</Text>
+            }
+          />
+        )}
       </SafeAreaView>
     </View>
   );

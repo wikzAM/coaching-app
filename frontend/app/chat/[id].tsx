@@ -15,6 +15,10 @@ import { BlurView } from 'expo-blur';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import Animated, {
+    withRepeat,
+    withSequence,
+    withTiming,
+    withDelay,
     FadeInDown,
     ZoomIn,
     Layout,
@@ -23,11 +27,62 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useKeyboardHandler } from 'react-native-keyboard-controller';
 
-// High-tension spring for that "expensive" UI feel
+import { supabase } from '@/lib/supabase';
+
 const SNAPPY_SPRING = {
     stiffness: 600,
     damping: 35,
     mass: 0.5,
+};
+
+const JumpingDot = ({ delay }: { delay: number }) => {
+    const translateY = useSharedValue(0);
+
+    React.useEffect(() => {
+        translateY.value = withRepeat(
+            withSequence(
+                withDelay(delay, withTiming(-6, { duration: 400 })), // Jump up
+                withTiming(0, { duration: 400 }) // Fall down
+            ),
+            -1, // Infinite repeat
+            false // Do not reverse
+        );
+    }, []);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: translateY.value }],
+    }));
+
+    return (
+        <Animated.View
+            style={[animatedStyle]}
+            className="w-2 h-2 rounded-full bg-foreground mx-0.5 opacity-60"
+        />
+    );
+};
+
+// ── ANIMATED TYPING INDICATOR COMPONENT ──
+const TypingBubble = () => {
+    return (
+        <Animated.View
+            entering={FadeInDown.springify()}
+            className="items-start mb-4 ml-1"
+        >
+            <View
+                className="rounded-[24px] overflow-hidden border-[2px] border-white/60 shadow-sm"
+                style={{ borderBottomLeftRadius: 4 }}
+            >
+                <BlurView intensity={80} tint="default" style={StyleSheet.absoluteFill} />
+                
+                {/* CHANGED: px-4 (tighter bubble), gap-0.5 (dots closer) */}
+                <View className="px-4 py-4 bg-surface/80 flex-row items-center h-[54px] gap-0.5">
+                    <JumpingDot delay={0} />
+                    <JumpingDot delay={150} />
+                    <JumpingDot delay={300} />
+                </View>
+            </View>
+        </Animated.View>
+    );
 };
 
 export default function ChatScreen() {
@@ -40,6 +95,57 @@ export default function ChatScreen() {
         { id: '1', text: `Hi Monish! I'm ${name}. How can I support your goals today?`, sender: 'bot' },
         { id: '2', text: `I can help you break down complex tasks or just listen.`, sender: 'bot' },
     ]);
+
+    const [isTyping, setIsTyping] = useState(false)
+
+    const sendMessage = useCallback(async () => {
+        if (inputText.trim() === '' || isTyping) return;
+
+        const userMsgText = inputText.trim();
+        const userMsgId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+        // 1. Update UI immediately for snappiness
+        setMessages(prev => [...prev, { id: userMsgId, text: userMsgText, sender: 'user' }]);
+        setInputText('');
+
+        try {
+            // timer for human ish feel
+            const minDelay = 600;
+            const maxDelay = 1500;
+            const randomDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+
+            await new Promise(resolve => setTimeout(resolve, randomDelay));
+
+            setIsTyping(true);
+            // 2. Call your Supabase Edge Function
+            // This matches the 'general-chat' folder name in your backend
+            const { data, error } = await supabase.functions.invoke('general-chat', {
+                body: {
+                    chat: userMsgText,
+                    coachID: id // 'id' from params maps to backend coachID
+                }
+            });
+
+            if (error) throw error;
+
+            // 3. Add the bot's response to the chat
+            if (data?.reply) {
+                setMessages(prev => [...prev, {
+                    id: `${Date.now()}-bot`,
+                    text: data.reply,
+                    sender: 'bot'
+                }]);
+            }
+        } catch (err) {
+            console.error('Chat Error:', err);
+            // Optional: Add an error message to the chat UI here
+        } finally {
+            setIsTyping(false);
+            requestAnimationFrame(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+            });
+        }
+    }, [inputText, id, isTyping]);
 
     const flatListRef = useRef<FlatList>(null);
     const keyboardHeight = useSharedValue(0);
@@ -59,22 +165,22 @@ export default function ChatScreen() {
         height: Math.abs(keyboardHeight.value)
     }));
 
-    const sendMessage = useCallback(() => {
-        if (inputText.trim() === '') return;
+    // const sendMessage = useCallback(() => {
+    //     if (inputText.trim() === '') return;
 
-        const newMessage = {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            text: inputText.trim(),
-            sender: 'user',
-        };
+    //     const newMessage = {
+    //         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    //         text: inputText.trim(),
+    //         sender: 'user',
+    //     };
 
-        setMessages(prev => [...prev, newMessage]);
-        setInputText('');
+    //     setMessages(prev => [...prev, newMessage]);
+    //     setInputText('');
 
-        requestAnimationFrame(() => {
-            flatListRef.current?.scrollToEnd({ animated: true });
-        });
-    }, [inputText]);
+    //     requestAnimationFrame(() => {
+    //         flatListRef.current?.scrollToEnd({ animated: true });
+    //     });
+    // }, [inputText]);
 
     const renderMessage = useCallback(({ item, index }: { item: any; index: number }) => {
         const isUser = item.sender === 'user';
@@ -181,9 +287,15 @@ export default function ChatScreen() {
                     keyExtractor={(item) => item.id}
                     contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20 }}
                     showsVerticalScrollIndicator={false}
+                    
+                    // 👇 CRITICAL: This ensures the bubble isn't hidden below the screen
                     onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                    
                     renderItem={renderMessage}
                     removeClippedSubviews={true}
+                    ListFooterComponent={
+                        isTyping ? <TypingBubble /> : <View className="h-4" />
+                    }
                 />
 
                 {/* ── INPUT AREA ── */}
