@@ -81,41 +81,6 @@ export default function HomeScreen() {
           <Rule className="bg-foreground/10" />
         </View>
 
-        {/* Stories Rail (Top Scroll) */}
-        <View className="pt-8 pb-8">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24 }}>
-            {/* 'Add Daily' Button */}
-            <TouchableOpacity className="mr-5 items-center">
-              <View className="w-[68px] h-[68px] rounded-full border-[2px] border-dashed border-secondary justify-center items-center mb-1.5 bg-surface">
-                <View className="w-[58px] h-[58px] rounded-full bg-background border border-secondary justify-center items-center">
-                  <Ionicons name="add" size={24} className="text-secondary" />
-                </View>
-              </View>
-              <Text className="text-[10px] font-bold text-secondary tracking-widest uppercase">Daily</Text>
-            </TouchableOpacity>
-
-            {/* Coach Circles */}
-            {coaches.map((coach) => (
-              <TouchableOpacity
-                key={coach.id}
-                className="mr-5 items-center"
-                onPress={() => router.push({
-                    pathname: "/chat/[id]",
-                    params: { id: coach.id.toString(), name: coach.name }
-                })}
-              >
-                <View className="w-[68px] h-[68px] rounded-full justify-center items-center mb-1.5 border-[2px] border-foreground/10 bg-surface">
-                  <View className="w-[58px] h-[58px] rounded-full bg-foreground justify-center items-center border-[2px] border-background">
-                    <Text className="text-xl font-black text-background">{BASE_EMOJI}</Text>
-                  </View>
-                </View>
-                <Text className="text-[10px] font-bold tracking-widest uppercase text-secondary">
-                  {coach.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
 
         <View className="flex-1" />
 

@@ -118,11 +118,10 @@ export default function ChatScreen() {
 
             setIsTyping(true);
             // 2. Call your Supabase Edge Function
-            // This matches the 'general-chat' folder name in your backend
             const { data, error } = await supabase.functions.invoke('general-chat', {
                 body: {
                     chat: userMsgText,
-                    coachID: id // 'id' from params maps to backend coachID
+                    coachID: id 
                 }
             });
 
@@ -130,20 +129,29 @@ export default function ChatScreen() {
 
             // 3. Add the bot's response to the chat
             if (data?.reply) {
-                setMessages(prev => [...prev, {
-                    id: `${Date.now()}-bot`,
-                    text: data.reply,
+                // SPLITTING LOGIC: Split by newline to create multiple bubbles
+                const botLines = data.reply
+                    .split('\n')
+                    .map((line: string) => line.trim())
+                    .filter((line: string) => line.length > 0);
+
+                const newBotMessages = botLines.map((line: string, index: number) => ({
+                    id: `${Date.now()}-bot-${index}`,
+                    text: line,
                     sender: 'bot'
-                }]);
+                }));
+
+                setMessages(prev => [...prev, ...newBotMessages]);
             }
         } catch (err) {
             console.error('Chat Error:', err);
             // Optional: Add an error message to the chat UI here
         } finally {
             setIsTyping(false);
-            requestAnimationFrame(() => {
+            // Scroll to bottom after state update
+            setTimeout(() => {
                 flatListRef.current?.scrollToEnd({ animated: true });
-            });
+            }, 100);
         }
     }, [inputText, id, isTyping]);
 
@@ -164,23 +172,6 @@ export default function ChatScreen() {
     const fakeViewStyle = useAnimatedStyle(() => ({
         height: Math.abs(keyboardHeight.value)
     }));
-
-    // const sendMessage = useCallback(() => {
-    //     if (inputText.trim() === '') return;
-
-    //     const newMessage = {
-    //         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    //         text: inputText.trim(),
-    //         sender: 'user',
-    //     };
-
-    //     setMessages(prev => [...prev, newMessage]);
-    //     setInputText('');
-
-    //     requestAnimationFrame(() => {
-    //         flatListRef.current?.scrollToEnd({ animated: true });
-    //     });
-    // }, [inputText]);
 
     const renderMessage = useCallback(({ item, index }: { item: any; index: number }) => {
         const isUser = item.sender === 'user';
