@@ -47,7 +47,10 @@ export async function summarizeMessages(messages: string) {
                 contents: prompt
             });
             
-            const toVectorize = response.text!.split("\n");
+            const toVectorize = response.text!
+              .split("\n")
+              .map(line => line.trim())
+              .filter(line => line.length > 0);
             return toVectorize;
             //Returns an array of bullet points to be vectorized in vector_embed.ts
             
