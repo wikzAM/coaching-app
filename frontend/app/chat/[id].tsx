@@ -28,6 +28,7 @@ import Animated, {
 import { useKeyboardHandler } from 'react-native-keyboard-controller';
 
 import { supabase } from '@/lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SNAPPY_SPRING = {
     stiffness: 600,
@@ -98,6 +99,34 @@ export default function ChatScreen() {
 
     const [isTyping, setIsTyping] = useState(false)
 
+        // ADD THESE TWO FUNCTIONS HERE:
+    const loadMessages = async () => {
+        try {
+            const chatKey = `chat_${id}`;
+            const stored = await AsyncStorage.getItem(chatKey);
+            if (stored) {
+                const loadedMessages = JSON.parse(stored);
+                setMessages(loadedMessages);
+            }
+        } catch (error) {
+            console.error('Failed to load messages:', error);
+        }
+    };
+
+    const saveMessages = async (msgs: typeof messages) => {
+        try {
+            const chatKey = `chat_${id}`;
+            await AsyncStorage.setItem(chatKey, JSON.stringify(msgs));
+        } catch (error) {
+            console.error('Failed to save messages:', error);
+        }
+    };
+
+    // Load messages when component mounts
+    React.useEffect(() => {
+        loadMessages();
+    }, []);
+
     const sendMessage = useCallback(async () => {
         if (inputText.trim() === '' || isTyping) return;
 
@@ -105,7 +134,11 @@ export default function ChatScreen() {
         const userMsgId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
         // 1. Update UI immediately for snappiness
-        setMessages(prev => [...prev, { id: userMsgId, text: userMsgText, sender: 'user' }]);
+    setMessages(prev => {
+        const newUserMessages = [...prev, { id: userMsgId, text: userMsgText, sender: 'user' }];
+        saveMessages(newUserMessages);
+        return newUserMessages;
+    });
         setInputText('');
 
         try {
@@ -130,11 +163,15 @@ export default function ChatScreen() {
 
             // 3. Add the bot's response to the chat
             if (data?.reply) {
-                setMessages(prev => [...prev, {
-                    id: `${Date.now()}-bot`,
-                    text: data.reply,
-                    sender: 'bot'
-                }]);
+                setMessages(prev => {
+                    const newBotMessages = [...prev, {
+                        id: `${Date.now()}-bot`,
+                        text: data.reply,
+                        sender: 'bot'
+                    }];
+                    saveMessages(newBotMessages);
+                    return newBotMessages;
+                });
             }
         } catch (err) {
             console.error('Chat Error:', err);
