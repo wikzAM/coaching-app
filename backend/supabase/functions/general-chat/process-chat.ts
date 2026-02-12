@@ -32,13 +32,27 @@ const genAI = new GoogleGenAI({ apiKey });
 function isRateLimitError(error: unknown): boolean {
     if (!error || typeof error !== 'object') return false;
     
-    const err = error as { status?: number; message?: string };
+    // Handle both direct error and nested error object
+    const err = error as { 
+        status?: number | string; 
+        message?: string;
+        error?: {
+            status?: number | string;
+            code?: number;
+            message?: string;
+        }
+    };
+    
+    // Check nested error first (Gemini's format)
+    const status = err.error?.status || err.error?.code || err.status;
+    const message = err.error?.message || err.message;
     
     return (
-        err.status === 429 ||
-        (err.message?.includes('quota') ?? false) ||
-        (err.message?.includes('rate limit') ?? false) ||
-        (err.message?.includes('RESOURCE_EXHAUSTED') ?? false)
+        status === 429 ||
+        status === "RESOURCE_EXHAUSTED" ||
+        (message?.includes('quota') ?? false) ||
+        (message?.includes('rate limit') ?? false) ||
+        (message?.includes('RESOURCE_EXHAUSTED') ?? false)
     );
 }
 
