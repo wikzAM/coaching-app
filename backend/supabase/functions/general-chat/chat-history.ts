@@ -6,7 +6,7 @@ const BUFFER_LIMIT = 15;
 
 export async function getBuffer(userID: string, coachID: string): Promise<ChatMessage[]> {
   const { data, error } = await supabase
-    .from('chat_buffer')
+    .from('bknd_chat_buffer')
     .select('messages')
     .eq('user_id', userID)
     .eq('coach_id', coachID)
@@ -33,7 +33,7 @@ export async function updateBuffer(
   }
 
   await supabase
-    .from('chat_buffer')
+    .from('bknd_chat_buffer')
     .upsert({
       user_id: userID,
       coach_id: coachID,
