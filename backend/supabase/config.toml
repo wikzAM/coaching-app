@@ -385,15 +385,15 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 
 [functions.general-chat]
 entrypoint = "./functions/general-chat/process-chat.ts"
-import_map = "./deno.json"  # <--- Add this line
+import_map = "./deno.json"
 verify_jwt = false
 
 [functions.coach-creation]
 entrypoint = "./functions/coach-model/coach.ts"
-import_map = "./deno.json"  # <--- Add this line
+import_map = "./deno.json"
 verify_jwt = false
 
 [functions.diagnostic-mcqs]
 entrypoint = "./functions/diagnostics/diagnostic-mcqs.ts"
-import_map = "./deno.json"  # <--- Add this line
+import_map = "./deno.json"
 verify_jwt = false
