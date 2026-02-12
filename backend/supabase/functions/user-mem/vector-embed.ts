@@ -6,7 +6,7 @@
   This is sent to create_row.ts
 */
 import { GoogleGenAI } from "google-gen";
-import { models } from "../models-to-quiery.ts";
+
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
