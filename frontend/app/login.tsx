@@ -66,8 +66,8 @@ export default function LoginScreen() {
                 // Expo Go: use Linking.createURL
                 redirectUrl = Linking.createURL('auth/callback');
             } else {
-                // Standalone: use custom scheme (set in app.json, e.g., doffy://auth/callback)
-                redirectUrl = 'doffy://auth/callback';
+                // Standalone: use scheme from app.json ("coachingapp")
+                redirectUrl = 'coachingapp://auth/callback';
             }
             console.log('OAuth redirect URL:', redirectUrl);
 
@@ -116,12 +116,22 @@ export default function LoginScreen() {
         setLoading(true);
         try {
             if (isSignUp) {
-                const { error } = await supabase.auth.signUp({
+                const { data, error } = await supabase.auth.signUp({
                     email: email.trim(),
                     password: password,
                 });
                 if (error) throw error;
-                Alert.alert('Check Email', 'Confirmation link sent.');
+                // If session exists, user is logged in (confirmations disabled)
+                // If no session, confirmations are enabled - try signing in directly
+                if (!data.session) {
+                    const { error: signInError } = await supabase.auth.signInWithPassword({
+                        email: email.trim(),
+                        password: password,
+                    });
+                    if (signInError) {
+                        Alert.alert('Check Email', 'Please confirm your email, then sign in.');
+                    }
+                }
             } else {
                 const { error } = await supabase.auth.signInWithPassword({
                     email: email.trim(),

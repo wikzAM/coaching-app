@@ -35,7 +35,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
         {/* -- Home Tab -- */}
         <TouchableOpacity
           onPress={() => navigation.navigate('index')}
-          style={{ padding: 8 }} // Added hit slop for easier tapping
+          style={{ padding: 8 }}
         >
           <Ionicons
             name={currentRoute === 'index' ? "home" : "home-outline"}
@@ -54,15 +54,6 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             size={22}
             color={currentRoute === 'marketplace' ? C.ink : C.pine}
           />
-        </TouchableOpacity>
-
-        {/* -- Add Button (Center) -- */}
-        {/* Does not navigate to a tab; usually opens a modal */}
-        <TouchableOpacity
-          onPress={() => console.log('Open Create Modal')}
-          style={{ padding: 8 }}
-        >
-          <Ionicons name="add" size={28} color={C.pine} />
         </TouchableOpacity>
 
         {/* -- Profile Tab -- */}

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState, useEffect } from 'react';
-import { ScrollView, Text, TouchableOpacity, View, StyleSheet, Switch, Alert } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { useCoach } from '@/lib/coach-context';
@@ -14,44 +14,7 @@ const C = {
     lilac: '#7869B0',
     shamrock: '#4C9F70',
     pine: '#4A706E',
-    gold: '#D4AF37',
 };
-
-const Rule = ({ colorClass = 'bg-ink' }: { colorClass?: string }) => (
-    <View className={`h-[1px] w-full ${colorClass}`} />
-);
-
-// ── REUSABLE GLASS MENU ITEM ──
-const MenuItem = ({ icon, label, value, isToggle = false, onPress }: any) => (
-    <TouchableOpacity activeOpacity={0.7} className="mb-3" onPress={onPress}>
-        <View
-            className="flex-row items-center justify-between p-4 rounded-2xl bg-white/40 border border-white/60"
-            style={{ borderColor: 'rgba(2, 9, 18, 0.05)' }}
-        >
-            <View className="flex-row items-center gap-3">
-                <View className="w-8 h-8 rounded-full bg-parchment justify-center items-center border border-ink/5">
-                    <Ionicons name={icon} size={16} color={C.pine} />
-                </View>
-                <Text className="text-sm font-bold text-ink">{label}</Text>
-            </View>
-
-            {isToggle ? (
-                <Switch
-                    value={true}
-                    trackColor={{ false: '#e0e0e0', true: C.lilac }}
-                    thumbColor={C.parchment}
-                    ios_backgroundColor="#e0e0e0"
-                    style={{ transform: [{ scale: 0.8 }] }}
-                />
-            ) : (
-                <View className="flex-row items-center gap-2">
-                    {value && <Text className="text-xs font-bold text-ink/40">{value}</Text>}
-                    <Ionicons name="chevron-forward" size={16} color={C.ink} opacity={0.3} />
-                </View>
-            )}
-        </View>
-    </TouchableOpacity>
-);
 
 export default function UserScreen() {
     const [loading, setLoading] = useState(false);
@@ -105,65 +68,60 @@ export default function UserScreen() {
 
                     {/* ── HEADER PROFILE ── */}
                     <View className="px-6 pt-6 pb-6 items-center">
-                        <View className="relative shadow-lilac/50">
-                            <View
-                                className="w-28 shadow-2xl h-28 rounded-full border-[3px] border-parchment justify-center items-center overflow-hidden"
-                                style={{ backgroundColor: C.ink }}
-                            >
-                                <Text className="text-5xl font-black text-parchment mt-1">{userName[0]}</Text>
-                            </View>
-                            <TouchableOpacity className="absolute bottom-0 right-0 bg-lilac w-8 h-8 rounded-full border-[3px] border-parchment justify-center items-center">
-                                <Ionicons name="pencil" size={14} color={C.parchment} />
-                            </TouchableOpacity>
+                        <View
+                            className="w-28 shadow-2xl h-28 rounded-full border-[3px] border-parchment justify-center items-center overflow-hidden"
+                            style={{ backgroundColor: C.ink }}
+                        >
+                            <Text className="text-5xl font-black text-parchment mt-1">{userName[0]}</Text>
                         </View>
 
                         <Text className="text-2xl font-black text-ink mt-4 -tracking-[1px]">{userName}</Text>
-                        <Text className="text-xs font-bold text-pine uppercase tracking-widest mt-1">Member</Text>
+                        {userEmail ? (
+                            <Text className="text-xs font-bold text-pine mt-1">{userEmail}</Text>
+                        ) : (
+                            <Text className="text-xs font-bold text-pine uppercase tracking-widest mt-1">Member</Text>
+                        )}
                     </View>
 
-                    {/* ── STATS GRID (Glassmorphic) ── */}
+                    {/* ── STATS (Glassmorphic) ── */}
                     <View className="px-6 mb-8">
-                        <View className="rounded-3xl overflow-hidden border border-white/60
-                         relative shadow-sm">
+                        <View className="rounded-3xl overflow-hidden border border-white/60 relative shadow-sm">
                             <BlurView
                                 intensity={80}
                                 tint="light"
                                 style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.5)' }]}
                             />
-                            <View className="flex-row p-5 justify-between items-center divide-x divide-ink/5">
-                                <View className="items-center flex-1">
-                                    <Text className="text-2xl font-black text-ink">{coaches.length}</Text>
-                                    <Text className="text-[9px] font-bold text-pine uppercase tracking-widest mt-1">Coaches</Text>
-                                </View>
-                                <View className="items-center flex-1">
-                                    <View className="flex-row items-center gap-1">
-                                        <Ionicons name="flame" size={20} color={C.lilac} />
-                                        <Text className="text-2xl font-black text-ink">0</Text>
-                                    </View>
-                                    <Text className="text-[9px] font-bold text-pine uppercase tracking-widest mt-1">Day Streak</Text>
-                                </View>
-                                <View className="items-center flex-1">
-                                    <Text className="text-2xl font-black text-ink">0</Text>
-                                    <Text className="text-[9px] font-bold text-pine uppercase tracking-widest mt-1">Sessions</Text>
-                                </View>
+                            <View className="p-5 items-center">
+                                <Text className="text-2xl font-black text-ink">{coaches.length}</Text>
+                                <Text className="text-[9px] font-bold text-pine uppercase tracking-widest mt-1">Coaches</Text>
                             </View>
                         </View>
                     </View>
 
-                    {/* ── MENU SECTIONS ── */}
+                    {/* ── ACCOUNT ── */}
                     <View className="px-6">
                         <Text className="text-[10px] font-black text-ink/30 uppercase tracking-[2px] mb-3 ml-2">Account</Text>
-                        <MenuItem icon="person-outline" label="Personal Details" />
-                        <MenuItem icon="wallet-outline" label="Subscription" value="Free Plan" />
-                        <MenuItem icon="notifications-outline" label="Notifications" isToggle />
-
-                        <Text className="text-[10px] font-black text-ink/30 uppercase tracking-[2px] mb-3 mt-4 ml-2">Preferences</Text>
-                        <MenuItem icon="color-palette-outline" label="Theme" value="System" />
-                        <MenuItem icon="globe-outline" label="Language" value="English" />
-
-                        <Text className="text-[10px] font-black text-ink/30 uppercase tracking-[2px] mb-3 mt-4 ml-2">Support</Text>
-                        <MenuItem icon="help-buoy-outline" label="Help Center" />
-                        <MenuItem icon="log-out-outline" label="Log Out" onPress={handleSignOut} />
+                        <TouchableOpacity
+                            activeOpacity={0.7}
+                            className="mb-3"
+                            onPress={handleSignOut}
+                            disabled={loading}
+                        >
+                            <View
+                                className="flex-row items-center justify-between p-4 rounded-2xl bg-white/40 border border-white/60"
+                                style={{ borderColor: 'rgba(2, 9, 18, 0.05)', opacity: loading ? 0.5 : 1 }}
+                            >
+                                <View className="flex-row items-center gap-3">
+                                    <View className="w-8 h-8 rounded-full bg-parchment justify-center items-center border border-ink/5">
+                                        <Ionicons name="log-out-outline" size={16} color={C.pine} />
+                                    </View>
+                                    <Text className="text-sm font-bold text-ink">
+                                        {loading ? 'Signing Out...' : 'Log Out'}
+                                    </Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={16} color={C.ink} opacity={0.3} />
+                            </View>
+                        </TouchableOpacity>
                     </View>
 
                     {/* ── Footer Version ── */}
