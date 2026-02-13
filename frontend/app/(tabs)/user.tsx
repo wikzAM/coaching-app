@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
-import { ScrollView, Text, TouchableOpacity, View, StyleSheet, Switch } from 'react-native';
+import React, { useState } from 'react';
+import { ScrollView, Text, TouchableOpacity, View, StyleSheet, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '@/lib/supabase';
 
 // ── DESIGN CONSTANTS ──
 const C = {
@@ -37,8 +38,8 @@ const Rule = ({ colorClass = 'bg-ink' }: { colorClass?: string }) => (
 );
 
 // ── REUSABLE GLASS MENU ITEM ──
-const MenuItem = ({ icon, label, value, isToggle = false }: any) => (
-    <TouchableOpacity activeOpacity={0.7} className="mb-3">
+const MenuItem = ({ icon, label, value, isToggle = false, onPress }: any) => (
+    <TouchableOpacity activeOpacity={0.7} className="mb-3" onPress={onPress}>
         <View
             className="flex-row items-center justify-between p-4 rounded-2xl bg-white/40 border border-white/60"
             style={{ borderColor: 'rgba(2, 9, 18, 0.05)' }}
@@ -69,6 +70,22 @@ const MenuItem = ({ icon, label, value, isToggle = false }: any) => (
 );
 
 export default function UserScreen() {
+    const [loading, setLoading] = useState(false);
+
+    const handleSignOut = async () => {
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.signOut();
+            if (error) throw error;
+            Alert.alert('Signed Out', 'You have been signed out.');
+            // Optionally, navigate to login or reset user state here
+        } catch (err: any) {
+            Alert.alert('Error', err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <View className="flex-1">
             {/* ── BACKGROUND ── */}
@@ -144,7 +161,7 @@ export default function UserScreen() {
 
                         <Text className="text-[10px] font-black text-ink/30 uppercase tracking-[2px] mb-3 mt-4 ml-2">Support</Text>
                         <MenuItem icon="help-buoy-outline" label="Help Center" />
-                        <MenuItem icon="log-out-outline" label="Log Out" />
+                        <MenuItem icon="log-out-outline" label="Log Out" onPress={handleSignOut} />
                     </View>
 
                     {/* ── Footer Version ── */}

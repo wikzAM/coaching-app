@@ -7,25 +7,44 @@ import {
     Alert,
     TextInput,
     ScrollView,
+    StyleSheet,
+    Platform,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
 import GoogleIcon from '../components/google-icon';
 import Constants from 'expo-constants';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useColorScheme } from '../hooks/use-color-scheme';
+import { Colors } from '../constants/theme';
 
 WebBrowser.maybeCompleteAuthSession();
-
 type AuthMethod = 'phone' | 'google' | 'email';
 
 // Check if running in Expo Go (where Firebase native modules aren't available)
 const isExpoGo = Constants.appOwnership === 'expo';
 
-// Lazy load PhoneAuth only when not in Expo Go
+// Fallback when phone-auth fails to load (e.g. Firebase native module not in build)
+const PhoneAuthUnavailable = () => (
+    <View className="w-full items-center py-8">
+        <Text className="text-gray-500 text-center">
+            Phone auth is not available in this build.{'\n'}
+            Use Google or Email to sign in.
+        </Text>
+    </View>
+);
+
+// Lazy load PhoneAuth only when not in Expo Go; fallback if Firebase native is missing
 const PhoneAuth = !isExpoGo
-    ? React.lazy(() => import('../components/phone-auth'))
+    ? React.lazy(() =>
+          import('../components/phone-auth').catch(() => ({ default: PhoneAuthUnavailable }))
+      )
     : null;
 
+// Move styles above component to avoid 'used before assignment' error
 export default function LoginScreen() {
     const [loading, setLoading] = useState(false);
     const [authMethod, setAuthMethod] = useState<AuthMethod>(isExpoGo ? 'google' : 'phone');
@@ -34,15 +53,24 @@ export default function LoginScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isSignUp, setIsSignUp] = useState(false);
+    const colorScheme = useColorScheme() ?? 'light';
+    const primaryColor = Colors[colorScheme].tint;
 
     // ============ GOOGLE AUTH LOGIC ============
     const onGoogleLogin = async () => {
         setLoading(true);
         try {
-            // Use the scheme from app.json for deep linking
-            const redirectUrl = Linking.createURL('auth/callback');
+            // Use custom scheme for standalone, Expo URL for Expo Go
+            let redirectUrl;
+            if (Constants.appOwnership === 'expo') {
+                // Expo Go: use Linking.createURL
+                redirectUrl = Linking.createURL('auth/callback');
+            } else {
+                // Standalone: use custom scheme (set in app.json, e.g., doffy://auth/callback)
+                redirectUrl = 'doffy://auth/callback';
+            }
             console.log('OAuth redirect URL:', redirectUrl);
-            
+
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
@@ -51,19 +79,19 @@ export default function LoginScreen() {
                 },
             });
             if (error) throw error;
-            
+
             if (data?.url) {
                 const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
                 console.log('WebBrowser result:', result);
-                
+
                 // Handle the result - extract tokens from URL if present
                 if (result.type === 'success' && result.url) {
                     const url = new URL(result.url);
                     const params = new URLSearchParams(url.hash.slice(1)); // Remove # from hash
-                    
+
                     const accessToken = params.get('access_token');
                     const refreshToken = params.get('refresh_token');
-                    
+
                     if (accessToken && refreshToken) {
                         const { error: sessionError } = await supabase.auth.setSession({
                             access_token: accessToken,
@@ -126,6 +154,8 @@ export default function LoginScreen() {
             </Suspense>
         );
     };
+
+    // Apple sign-in button removed (requires paid Apple Developer account)
 
     const renderGoogleAuth = () => (
         <View className="w-full">
@@ -201,26 +231,68 @@ export default function LoginScreen() {
         );
     };
 
-    return (
-        <View className="flex-1 bg-white">
-            <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }} keyboardShouldPersistTaps="handled">
-
-                <View className="mb-8 items-center">
-                    <Text className="text-3xl font-bold text-gray-900 mb-2">Welcome</Text>
-                    <Text className="text-gray-500 text-center">Sign in to your AI Coach</Text>
+        // ── HERO/BRANDING ──
+        const renderHero = () => (
+            <Animated.View entering={FadeInDown.springify()} className="items-center mb-8">
+                <View className="w-24 h-24 rounded-full bg-primary/90 border-[4px] border-white/80 shadow-2xl shadow-black/20 items-center justify-center mb-4">
+                    <Animated.Text entering={FadeInDown.delay(100).springify()} className="text-6xl font-black text-white">🦩</Animated.Text>
                 </View>
+                <Animated.Text entering={FadeInDown.delay(200).springify()} className="text-4xl font-black text-primary mb-2 tracking-tight">Welcome to Doffy</Animated.Text>
+                <Animated.Text entering={FadeInDown.delay(300).springify()} className="text-secondary text-center text-base font-semibold max-w-[260px]">Your playful AI coach for growth, wellness, and fun. Sign in to begin your journey!</Animated.Text>
+            </Animated.View>
+        );
 
-                {/* TABS */}
-                <View style={{ flexDirection: 'row', marginBottom: 24, backgroundColor: '#F3F4F6', borderRadius: 12, padding: 4, width: '100%' }}>
-                    {availableMethods.map(renderTab)}
+        return (
+            <View className="flex-1 bg-background">
+                {/* Animated Gradient Background */}
+                <LinearGradient
+                    colors={[primaryColor, 'transparent', primaryColor]}
+                    locations={[0, 0.5, 1]}
+                    style={StyleSheet.absoluteFill}
+                    pointerEvents="none"
+                />
+                {/* Glassmorphic Blur Card */}
+                <View className="flex-1 items-center justify-center px-2">
+                    <BlurView intensity={80} tint={colorScheme} style={styles.glassCard}>
+                        <ScrollView
+                            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, minWidth: 320, maxWidth: 400 }}
+                            keyboardShouldPersistTaps="handled"
+                            showsVerticalScrollIndicator={false}
+                        >
+                            {renderHero()}
+                            {/* TABS */}
+                            <View className="flex-row mb-6 bg-background/60 rounded-2xl p-1 w-full shadow-md shadow-black/10 border border-border-subtle">
+                                {availableMethods.map(renderTab)}
+                            </View>
+                            {/* CONTENT */}
+                            {authMethod === 'phone' && renderPhoneAuth()}
+                            {authMethod === 'google' && renderGoogleAuth()}
+                            {authMethod === 'email' && renderEmailAuth()}
+                        </ScrollView>
+                    </BlurView>
                 </View>
+            </View>
+        );
 
-                {/* CONTENT */}
-                {authMethod === 'phone' && renderPhoneAuth()}
-                {authMethod === 'google' && renderGoogleAuth()}
-                {authMethod === 'email' && renderEmailAuth()}
-
-            </ScrollView>
-        </View>
-    );
 }
+
+// Glassmorphic card style
+const styles = StyleSheet.create({
+    glassCard: {
+        marginTop: Platform.OS === 'web' ? 48 : 0,
+        marginBottom: Platform.OS === 'web' ? 48 : 0,
+        borderRadius: 32,
+        overflow: 'hidden',
+        shadowColor: '#7869B0',
+        shadowOpacity: 0.15,
+        shadowRadius: 32,
+        shadowOffset: { width: 0, height: 8 },
+        minHeight: 520,
+        alignSelf: 'center',
+        width: '100%',
+        maxWidth: 420,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.5)',
+        backgroundColor: 'rgba(255,255,255,0.25)',
+    },
+});

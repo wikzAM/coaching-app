@@ -3,7 +3,7 @@ What is done:
 coach into the db
 
 What you need to do:
-In supabase, the "coach" table is where all ts is handled
+In supabase, the "coach" table is where all this is handled
 Add a "name" column for the name the user can give to the coach 
 Add a "created by" column which holds the uuid (type is uuid) of the user who created it
 Make sure to update coach.ts such that the created by and name rows are also updated. You can assume that the json file that 

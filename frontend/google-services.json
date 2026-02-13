@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "947679199294",
+    "project_id": "aicoach-485818",
+    "storage_bucket": "aicoach-485818.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:947679199294:android:060c1ec2dd33e3e04ad16f",
+        "android_client_info": {
+          "package_name": "com.wikzam.coachingapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "947679199294-34d5ichfsdgblgucsdcbb2l7lq2isusp.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDZweC6uKx35MUboIh2HeBlJMxrCUr5b90"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "947679199294-34d5ichfsdgblgucsdcbb2l7lq2isusp.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
