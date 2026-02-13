@@ -140,7 +140,7 @@ export default function HomeScreen() {
               <Ionicons name="flame" size={22} className="text-primary" />
               <Text className="text-[13px] font-bold text-foreground">0</Text>
             </View>
-            <Text className="text-[35px] font-black -tracking-[3px] text-foreground">COACHAI</Text>
+            <Text className="text-[35px] font-black -tracking-[3px] text-foreground">DOFFY</Text>
             <TouchableOpacity className="relative">
               <Ionicons name="notifications-outline" size={22} className="text-foreground" />
             </TouchableOpacity>

@@ -2,10 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from './supabase';
 
-// 1. DEV MODE CONSTANT (Matches your backend)
-const TEST_USER_ID = "099cc5d8-2318-40e7-b1f8-334a4146a014";
-
-// 2. Define the shape of a Coach (Matches your Database & UI)
+// Define the shape of a Coach (Matches your Database & UI)
 export interface Coach {
   id: string;
   name: string;
@@ -37,20 +34,7 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
         return;
       }
-      // 2. DEV MODE: Fetch coaches created by TEST_USER_ID for development/testing
-      const { data: coachData, error: coachError } = await supabase
-        .from('coaches')
-        .select('*')
-        .eq('created_by', TEST_USER_ID)
-        .order('created_at', { ascending: false });
-      if (coachError) {
-        // Partner: Log error if fetching test coaches fails
-        console.error('Error fetching coaches:', coachError);
-        setCoaches([]);
-        setIsLoading(false);
-        return;
-      }
-      // 3. Fetch ONLY the coaches this user has hired (production logic)
+      // 2. Fetch ONLY the coaches this user has hired (production logic)
       const user = session.user;
       const { data: userCoachData, error: userCoachError } = await supabase
         .from('user_coaches')

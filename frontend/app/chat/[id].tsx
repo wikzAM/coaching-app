@@ -93,7 +93,7 @@ export default function ChatScreen() {
 
     const [inputText, setInputText] = useState('');
     const [messages, setMessages] = useState([
-        { id: '1', text: `Hi Monish! I'm ${name}. How can I support your goals today?`, sender: 'bot' },
+        { id: '1', text: `Hey! I'm ${name}. How can I support your goals today?`, sender: 'bot' },
         { id: '2', text: `I can help you break down complex tasks or just listen.`, sender: 'bot' },
     ]);
 

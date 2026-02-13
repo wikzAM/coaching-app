@@ -176,7 +176,7 @@ export default function CreateCoachScreen() {
           coach_name: finalName
         },
         headers: {
-          Authorization: `Bearer ${session?.access_token || "dummy-token"}`
+          Authorization: `Bearer ${session?.access_token || ""}`
         }
       });
       if (error) throw error;

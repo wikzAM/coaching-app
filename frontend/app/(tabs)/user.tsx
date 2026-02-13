@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScrollView, Text, TouchableOpacity, View, StyleSheet, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
+import { useCoach } from '@/lib/coach-context';
 
 // ── DESIGN CONSTANTS ──
 const C = {
@@ -14,23 +15,6 @@ const C = {
     shamrock: '#4C9F70',
     pine: '#4A706E',
     gold: '#D4AF37',
-};
-
-// ── MOCK DATA ──
-const USER = {
-    name: "Monish Ram",
-    plan: "Premium Member",
-    avatarColor: C.ink,
-    stats: {
-        sessions: 155,
-        streak: 12,
-        credits: 450
-    },
-    settings: {
-        planType: "Pro Plan",
-        theme: "Light",
-        language: "English"
-    }
 };
 
 const Rule = ({ colorClass = 'bg-ink' }: { colorClass?: string }) => (
@@ -71,6 +55,24 @@ const MenuItem = ({ icon, label, value, isToggle = false, onPress }: any) => (
 
 export default function UserScreen() {
     const [loading, setLoading] = useState(false);
+    const [userName, setUserName] = useState('User');
+    const [userEmail, setUserEmail] = useState('');
+    const { coaches } = useCoach();
+
+    useEffect(() => {
+        const getUser = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                const name = session.user.user_metadata?.full_name
+                    || session.user.user_metadata?.name
+                    || session.user.email?.split('@')[0]
+                    || 'User';
+                setUserName(name);
+                setUserEmail(session.user.email || '');
+            }
+        };
+        getUser();
+    }, []);
 
     const handleSignOut = async () => {
         setLoading(true);
@@ -106,17 +108,17 @@ export default function UserScreen() {
                         <View className="relative shadow-lilac/50">
                             <View
                                 className="w-28 shadow-2xl h-28 rounded-full border-[3px] border-parchment justify-center items-center overflow-hidden"
-                                style={{ backgroundColor: USER.avatarColor }}
+                                style={{ backgroundColor: C.ink }}
                             >
-                                <Text className="text-5xl font-black text-parchment mt-1">{USER.name[0]}</Text>
+                                <Text className="text-5xl font-black text-parchment mt-1">{userName[0]}</Text>
                             </View>
                             <TouchableOpacity className="absolute bottom-0 right-0 bg-lilac w-8 h-8 rounded-full border-[3px] border-parchment justify-center items-center">
                                 <Ionicons name="pencil" size={14} color={C.parchment} />
                             </TouchableOpacity>
                         </View>
 
-                        <Text className="text-2xl font-black text-ink mt-4 -tracking-[1px]">{USER.name}</Text>
-                        <Text className="text-xs font-bold text-pine uppercase tracking-widest mt-1">{USER.plan}</Text>
+                        <Text className="text-2xl font-black text-ink mt-4 -tracking-[1px]">{userName}</Text>
+                        <Text className="text-xs font-bold text-pine uppercase tracking-widest mt-1">Member</Text>
                     </View>
 
                     {/* ── STATS GRID (Glassmorphic) ── */}
@@ -130,19 +132,19 @@ export default function UserScreen() {
                             />
                             <View className="flex-row p-5 justify-between items-center divide-x divide-ink/5">
                                 <View className="items-center flex-1">
-                                    <Text className="text-2xl font-black text-ink">{USER.stats.sessions}</Text>
-                                    <Text className="text-[9px] font-bold text-pine uppercase tracking-widest mt-1">Sessions</Text>
+                                    <Text className="text-2xl font-black text-ink">{coaches.length}</Text>
+                                    <Text className="text-[9px] font-bold text-pine uppercase tracking-widest mt-1">Coaches</Text>
                                 </View>
                                 <View className="items-center flex-1">
                                     <View className="flex-row items-center gap-1">
                                         <Ionicons name="flame" size={20} color={C.lilac} />
-                                        <Text className="text-2xl font-black text-ink">{USER.stats.streak}</Text>
+                                        <Text className="text-2xl font-black text-ink">0</Text>
                                     </View>
                                     <Text className="text-[9px] font-bold text-pine uppercase tracking-widest mt-1">Day Streak</Text>
                                 </View>
                                 <View className="items-center flex-1">
-                                    <Text className="text-2xl font-black text-ink">{USER.stats.credits}</Text>
-                                    <Text className="text-[9px] font-bold text-pine uppercase tracking-widest mt-1">Credits</Text>
+                                    <Text className="text-2xl font-black text-ink">0</Text>
+                                    <Text className="text-[9px] font-bold text-pine uppercase tracking-widest mt-1">Sessions</Text>
                                 </View>
                             </View>
                         </View>
@@ -152,12 +154,12 @@ export default function UserScreen() {
                     <View className="px-6">
                         <Text className="text-[10px] font-black text-ink/30 uppercase tracking-[2px] mb-3 ml-2">Account</Text>
                         <MenuItem icon="person-outline" label="Personal Details" />
-                        <MenuItem icon="wallet-outline" label="Subscription" value={USER.settings.planType} />
+                        <MenuItem icon="wallet-outline" label="Subscription" value="Free Plan" />
                         <MenuItem icon="notifications-outline" label="Notifications" isToggle />
 
                         <Text className="text-[10px] font-black text-ink/30 uppercase tracking-[2px] mb-3 mt-4 ml-2">Preferences</Text>
-                        <MenuItem icon="color-palette-outline" label="Theme" value={USER.settings.theme} />
-                        <MenuItem icon="globe-outline" label="Language" value={USER.settings.language} />
+                        <MenuItem icon="color-palette-outline" label="Theme" value="System" />
+                        <MenuItem icon="globe-outline" label="Language" value="English" />
 
                         <Text className="text-[10px] font-black text-ink/30 uppercase tracking-[2px] mb-3 mt-4 ml-2">Support</Text>
                         <MenuItem icon="help-buoy-outline" label="Help Center" />
@@ -166,7 +168,7 @@ export default function UserScreen() {
 
                     {/* ── Footer Version ── */}
                     <View className="items-center mt-8 opacity-30">
-                        <Text className="text-[10px] font-bold text-ink">CoachAI v1.0.4</Text>
+                        <Text className="text-[10px] font-bold text-ink">Doffy v1.0.0</Text>
                     </View>
 
                 </ScrollView>
