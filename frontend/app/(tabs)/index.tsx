@@ -3,12 +3,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { ScrollView, Text, TouchableOpacity, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, StyleSheet, View, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
 import { useRouter } from 'expo-router';
 import { useCoach } from '@/lib/coach-context';
+import { supabase } from '@/lib/supabase'; // <--- Added Import
 
 // --- CONFIG ---
 const BASE_EMOJI = '🤖'; 
@@ -39,6 +40,79 @@ export default function HomeScreen() {
 
   // 2. Prepare Carousel Data
   const CAROUSEL_DATA = [{ id: 'new', type: 'create' }, ...coaches];
+
+  // --- ACTIONS ---
+
+  // Skeleton function for RevenueCat Purchase
+  const handlePurchasePremium = async () => {
+    console.log("Initiating Purchase Flow...");
+    
+    // --- REVENUECAT SKELETON CODE ---
+    /*
+    try {
+      // 1. Import RevenueCat (make sure to install react-native-purchases)
+      // import Purchases from 'react-native-purchases';
+
+      // 2. Fetch Offerings
+      const offerings = await Purchases.getOfferings();
+      
+      if (offerings.current !== null && offerings.current.availablePackages.length !== 0) {
+        // Select the package (e.g., Monthly)
+        const packageToBuy = offerings.current.availablePackages[0];
+        
+        // 3. Purchase
+        const { customerInfo } = await Purchases.purchasePackage(packageToBuy);
+        
+        // 4. Verify Entitlement (replace 'pro' with your actual identifier)
+        if (typeof customerInfo.entitlements.active['pro'] !== "undefined") {
+           Alert.alert("Success", "You are now a Premium member!");
+           // Optionally navigate immediately:
+           router.push('/create-coach');
+        }
+      }
+    } catch (e: any) {
+      if (!e.userCancelled) {
+        Alert.alert("Purchase Error", e.message);
+      }
+    }
+    */
+
+    // MOCK RESPONSE FOR NOW
+    Alert.alert("Premium Mock", "RevenueCat SDK purchase flow would trigger here.");
+  };
+
+  const handleCreatePress = async () => {
+    // 1. Check Limit via Supabase RPC
+    const { data: isLimitReached, error } = await supabase.rpc('check_limit_reached');
+
+    if (error) {
+      console.error(error);
+      Alert.alert("Error", "Could not verify account limits. Please try again.");
+      return;
+    }
+
+    // 2. Handle Result
+    if (isLimitReached) {
+      Alert.alert(
+        "Limit Reached",
+        "You have reached the maximum number of coaches allowed on the free plan.",
+        [
+          { 
+            text: "Cancel", 
+            style: "cancel" 
+          },
+          { 
+            text: "Get Premium", 
+            style: "default", 
+            onPress: handlePurchasePremium // <--- Triggers the payment flow
+          }
+        ]
+      );
+    } else {
+      // 3. Proceed if limit not reached
+      router.push('/create-coach');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -100,7 +174,7 @@ export default function HomeScreen() {
                   <TouchableOpacity 
                     className="border-2 border-dashed border-secondary rounded-3xl justify-center items-center bg-surface" 
                     style={{ width: CARD_WIDTH, height: 260 }}
-                    onPress={() => router.push('/create-coach')} 
+                    onPress={handleCreatePress} // <--- UPDATED: Calls the check function
                   >
                     <View className="w-11 h-11 rounded-full border-[1.5px] border-secondary justify-center items-center mb-2.5">
                       <Ionicons name="add" size={22} className="text-secondary" />
