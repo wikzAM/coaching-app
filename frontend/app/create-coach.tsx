@@ -125,6 +125,26 @@ export default function CreateCoachScreen() {
   const handleCreateCoach = async () => {
     setLoading(true);
     try {
+      // --- CHECK LIMIT ---
+      const { data: isLimitReached, error: limitError } = await supabase.rpc('check_limit_reached');
+
+      if (limitError) {
+        console.error('Limit check failed:', limitError);
+        Alert.alert("Error", "Unable to verify account limits.");
+        setLoading(false);
+        return;
+      }
+
+      if (isLimitReached) {
+        Alert.alert(
+          "Limit Reached", 
+          "You have reached the maximum number of coaches allowed. Please upgrade or delete a coach to create a new one."
+        );
+        setLoading(false);
+        return;
+      }
+      // -------------------
+
       // 1. Get Session (Optional check)
       const { data: { session } } = await supabase.auth.getSession();
 
