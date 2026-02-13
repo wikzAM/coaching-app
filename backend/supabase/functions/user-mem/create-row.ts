@@ -44,7 +44,7 @@ export async function createRow(userID: string, coachID: string, messages: ChatM
       vector = await generateVector(point);
 
       const { error } = await supabase
-        .from('user-memories')
+        .from('user_memories')
         .insert({
           user_id: userID,
           coach_id: coachID,

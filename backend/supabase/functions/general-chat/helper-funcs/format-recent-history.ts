@@ -2,7 +2,7 @@
     without having the code be much longer visually
 */
 
-import { ChatMessage } from "../types.ts";
+import { ChatMessage } from "../../types.ts";
 
 export const createMsg = (
   role: "user" | "model" | "system",

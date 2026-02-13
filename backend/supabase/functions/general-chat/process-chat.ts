@@ -3,8 +3,10 @@ import { generateVector } from "./vector-embed-two.ts";
 import { GoogleGenAI } from "google-gen"; 
 import { CORE_SYSTEM_PROMPT } from "../../supabase-setup.ts";
 import { getBuffer, updateBuffer } from "./chat-history.ts";
-import { formatRecentHistory, createMsg } from "./format-recent-history.ts";
-import { isRateLimitError } from "./rate-limit-err.ts";
+import { formatRecentHistory, createMsg } from "./helper-funcs/format-recent-history.ts";
+import { isRateLimitError } from "./helper-funcs/rate-limit-err.ts";
+import { models } from "../models-to-quiery.ts";
+
 // We create types corresponding to how data is organized on supabase
 interface MemoryRow {
   memory_id: string;
@@ -92,14 +94,6 @@ Deno.serve(async (req) => {
       Personality: ${coach.personality || "Neutral"}
       Instructions: ${coach.custom_instructions || "None"}
     `;
-
-    const models = [
-      "gemini-2.5-pro",
-      "gemini-2.5-flash",
-      "gemini-2.0-flash-exp",
-      "gemini-1.5-flash",
-      "gemini-1.5-flash-8b"
-    ];
 
     let agentChatMsg: string | null = null;
 
