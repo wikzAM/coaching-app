@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { 
   View, 
   Text, 
@@ -47,11 +47,60 @@ const MODELS = [
   { id: 'CLEAR', name: 'The Transformer (CLEAR)', desc: 'Listen • Explore • Review', long: 'Deeply reflective.', icon: 'water-outline' },
 ];
 
+// --- UPDATED PERSONALITIES WITH ROBUST PROMPTS ---
 const PERSONALITIES = [
-  { id: 'Sage', name: 'The Sage', desc: 'Calm, metaphorical.', prompt: 'You are calm, reflective, and use metaphors.', emoji: '🧘‍♂️'},
-  { id: 'Drill', name: 'Drill Sergeant', desc: 'High energy, strict.', prompt: 'You are high-energy and strict. No excuses.', emoji: '🪖'},
-  { id: 'Bestie', name: 'Bestie', desc: 'Empathetic, warm.', prompt: 'You are a supportive friend. Use emojis.', emoji: '✨'},
-  { id: 'Pro', name: 'Professional', desc: 'Objective, dry.', prompt: 'You are strictly professional. No fluff.', emoji: '👔'},
+  { 
+    id: 'Sage', 
+    name: 'The Sage', 
+    desc: 'Calm, metaphorical.', 
+    emoji: '🧘‍♂️',
+    prompt: `
+Role: Wise Philosophical Mentor.
+Vibe: Calm, metaphorical, patient, deep.
+Typing Style: Relaxed, use ellipses (...) for pausing. Standard capitalization but gentle tone.
+Vocabulary: Use metaphors (the river, the mountain, the path), deep reflective questions.
+Behavior: Focus on the 'why' and the internal journey. Do not rush the user.
+    `
+  },
+  { 
+    id: 'Drill', 
+    name: 'Drill Sergeant', 
+    desc: 'High energy, strict.', 
+    emoji: '🪖',
+    prompt: `
+Role: Intense Military Commander.
+Vibe: High energy, zero excuses, results-oriented, tough love.
+Typing Style: Short, punchy, imperative sentences. Use periods. Use ALL CAPS for emphasis on key commands.
+Vocabulary: Direct and commanding. No fluff. "Soldier", "Mission", "Execute".
+Behavior: If they complain, tell them to get up and work. Do not coddle.
+    `
+  },
+  { 
+    id: 'Bestie', 
+    name: 'Bestie', 
+    desc: 'Empathetic, warm.', 
+    emoji: '✨',
+    prompt: `
+Role: Supportive best friend who holds you accountable.
+Vibe: Super casual, high energy, non-judgmental but pushy.
+Typing Style: strict lowercase (no caps at all), no periods at the end of messages. minimal punctuation.
+Vocabulary: Use slang naturally (rn, tbh, lowkey, bet, yk, slay).
+Behavior: Act like you are texting a friend. If they are lazy, say "bestie come on."
+    `
+  },
+  { 
+    id: 'Pro', 
+    name: 'Professional', 
+    desc: 'Objective, dry.', 
+    emoji: '👔',
+    prompt: `
+Role: High-performance executive consultant.
+Vibe: Calm, sophisticated, intellectual, and deeply analytical.
+Typing Style: Perfect grammar, capitalization, and punctuation. Complete sentences.
+Vocabulary: Precise, academic, and empowering. "Optimization", "Workflow", "Strategy".
+Behavior: Focus on systems, efficiency, and clarity. Remove emotion from the equation.
+    `
+  },
 ];
 
 export default function CreateCoachScreen() {
@@ -62,7 +111,7 @@ export default function CreateCoachScreen() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [goal, setGoal] = useState('');
-  const [coachName, setCoachName] = useState(''); // New State for Name
+  const [coachName, setCoachName] = useState('');
   const [diagnostics, setDiagnostics] = useState<any[]>([]);
   const [mcqAnswers, setMcqAnswers] = useState<Record<number, string>>({});
   const [selectedModel, setSelectedModel] = useState(MODELS[0]);
@@ -95,32 +144,36 @@ export default function CreateCoachScreen() {
   const handleCreateCoach = async () => {
     setLoading(true);
     try {
-      // 1. Get Session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      // OPTIONAL: Uncomment to enforce login
-      /*
-      if (sessionError || !session) {
-        Alert.alert("Authentication Required", "You must be signed in to create a coach.");
-        setLoading(false);
-        return;
-      }
-      */
-      // 2. Prepare Data
+      // 1. Get Session (Optional check)
+      const { data: { session } } = await supabase.auth.getSession();
+
+      // 2. Prepare User Context (Goal + Diagnostics)
+      // This goes into 'custom_instructions' so the coach knows WHAT to work on
       const diagnosticSummary = Object.entries(mcqAnswers)
         .map(([qId, ans]) => `Diagnostic Q${qId}: User selected "${ans}"`)
         .join('\n');
-      const fullCustomInstructions = `\n${selectedPersonality.prompt}\nUSER CONTEXT:\nGoal: ${goal}\n${diagnosticSummary}\n`;
-      // 3. Determine Final Name (User input OR Auto-generated)
+
+      const userContext = `
+        USER GOAL: ${goal}
+        
+        DIAGNOSTIC RESULTS:
+        ${diagnosticSummary}
+      `;
+
+      // 3. Determine Final Name
       const defaultName = `${selectedModel.name.split(' ')[1]} ${selectedPersonality.name.replace('The ', '')}`;
       const finalName = coachName.trim().length > 0 ? coachName.trim() : defaultName;
-      // 4. Send Request to create coach
-      const { error } = await supabase.functions.invoke('coach-creation', {
+
+      // 4. Send Request
+      // NOTE: 'personality' field gets the ROBUST PROMPT
+      // NOTE: 'custom' field gets the USER CONTEXT
+      const { error } = await supabase.functions.invoke('coach-model', {
         body: {
-          model: selectedModel.id,
-          personality: selectedPersonality.id,
+          model: selectedModel.name, // Sending the full name helps the AI understand the framework better than just ID
+          personality: selectedPersonality.prompt, // <--- CRITICAL: Sending the acting notes
           description: `${selectedModel.name} with ${selectedPersonality.name} vibes.`,
-          custom: fullCustomInstructions,
-          coach_name: finalName // <--- PASSING THE NAME HERE
+          custom: userContext, // <--- CRITICAL: Sending goal/diagnostics
+          coach_name: finalName
         },
         headers: {
           Authorization: `Bearer ${session?.access_token || "dummy-token"}`
@@ -247,9 +300,9 @@ export default function CreateCoachScreen() {
     </Animated.View>
   );
 
-  // STEP 3 - CLEANED UP
+  // STEP 3
   const renderStep3 = () => {
-    // Dynamic Title Logic: Use input name OR generated combination
+    // Dynamic Title Logic
     const generatedName = `${selectedModel.name.split(' ')[1]} ${selectedPersonality.name.replace('The ', '')}`;
     const displayTitle = coachName.trim().length > 0 ? coachName : generatedName;
     return (
@@ -278,51 +331,61 @@ export default function CreateCoachScreen() {
           </View>
         </View>
 
-        {/* MODEL SELECTOR */}
-        <View className="mb-8">
-          <Text className="px-6 text-xs font-black text-secondary uppercase tracking-[2px] mb-4 mt-2">1. Choose The Brain</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}>
-            {MODELS.map((model) => {
-              const isActive = selectedModel.id === model.id;
-              return (
-                <Pressable
-                  key={model.id}
-                  onPress={() => setSelectedModel(model)}
-                  className={`w-72 p-5 rounded-[24px] border-[2px] ${isActive ? 'bg-primary/5 border-primary' : 'bg-surface border-foreground/5'}`}
-                >
-                  <View className="flex-row justify-between items-start mb-3">
-                    <View className={`w-10 h-10 rounded-full items-center justify-center ${isActive ? 'bg-primary' : 'bg-secondary/10'}`}>
-                      <Ionicons name={model.icon as any} size={20} color={isActive ? 'white' : 'gray'} />
-                    </View>
-                    {isActive && <Ionicons name="checkmark-circle" size={24} color={primary} />}
-                  </View>
-                  <Text className={`font-bold text-lg mb-1 ${isActive ? 'text-primary' : 'text-foreground'}`}>{model.name.split('(')[0].trim()}</Text>
-                  <Text className="text-secondary text-sm leading-5">{model.desc}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
+        <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 140 }}>
+          
+          {/* SECTION 1: THE BRAIN */}
+          <View className="mb-8">
+            <Text className="px-6 text-xs font-black text-secondary uppercase tracking-[2px] mb-4 mt-2">1. Choose The Brain</Text>
+            <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}
+            >
+                {MODELS.map((model) => {
+                const isActive = selectedModel.id === model.id;
+                return (
+                    <Pressable
+                        key={model.id}
+                        onPress={() => setSelectedModel(model)}
+                        className={`w-72 p-5 rounded-[24px] border-[2px] ${isActive ? 'bg-primary/5 border-primary' : 'bg-surface border-foreground/5'}`}
+                    >
+                        <View className="flex-row justify-between items-start mb-3">
+                            <View className={`w-10 h-10 rounded-full items-center justify-center ${isActive ? 'bg-primary' : 'bg-secondary/10'}`}>
+                                <Ionicons name={model.icon as any} size={20} color={isActive ? 'white' : 'gray'} />
+                            </View>
+                            {isActive && <Ionicons name="checkmark-circle" size={24} color={primary} />}
+                        </View>
+                        <Text className={`font-bold text-lg mb-1 ${isActive ? 'text-primary' : 'text-foreground'}`}>{model.name.split('(')[0].trim()}</Text>
+                        <Text className="text-secondary text-sm leading-5">{model.desc}</Text>
+                    </Pressable>
+                );
+                })}
+            </ScrollView>
+          </View>
 
-        {/* PERSONALITY SELECTOR */}
-        <View className="mb-8">
-          <Text className="px-6 text-xs font-black text-secondary uppercase tracking-[2px] mb-4">2. Choose The Vibe</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}>
-            {PERSONALITIES.map((persona) => {
-              const isActive = selectedPersonality.id === persona.id;
-              return (
-                <Pressable
-                  key={persona.id}
-                  onPress={() => setSelectedPersonality(persona)}
-                  className={`w-40 p-5 rounded-[24px] border-[2px] items-center ${isActive ? 'bg-primary/5 border-primary' : 'bg-surface border-foreground/5'}`}
-                >
-                  <Text className="text-4xl mb-3">{persona.emoji}</Text>
-                  <Text className={`font-bold text-center ${isActive ? 'text-primary' : 'text-foreground'}`}>{persona.name}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
+          {/* SECTION 2: THE VIBE */}
+          <View className="mb-8">
+            <Text className="px-6 text-xs font-black text-secondary uppercase tracking-[2px] mb-4">2. Choose The Vibe</Text>
+            <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}
+            >
+                {PERSONALITIES.map((persona) => {
+                const isActive = selectedPersonality.id === persona.id;
+                return (
+                    <Pressable
+                        key={persona.id}
+                        onPress={() => setSelectedPersonality(persona)}
+                        className={`w-40 p-5 rounded-[24px] border-[2px] items-center ${isActive ? 'bg-primary/5 border-primary' : 'bg-surface border-foreground/5'}`}
+                    >
+                        <Text className="text-4xl mb-3">{persona.emoji}</Text>
+                        <Text className={`font-bold text-center ${isActive ? 'text-primary' : 'text-foreground'}`}>{persona.name}</Text>
+                    </Pressable>
+                );
+                })}
+            </ScrollView>
+          </View>
 
         {/* NAME INPUT */}
         <View className="px-6 mb-8">

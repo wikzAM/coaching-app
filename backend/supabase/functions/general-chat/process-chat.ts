@@ -4,7 +4,7 @@ import { GoogleGenAI } from "google-gen";
 import { CORE_SYSTEM_PROMPT } from "../../supabase-setup.ts";
 import { getBuffer, updateBuffer } from "./chat-history.ts";
 import { formatRecentHistory, createMsg } from "./format-recent-history.ts";
-
+import { isRateLimitError } from "./rate-limit-err.ts";
 // We create types corresponding to how data is organized on supabase
 interface MemoryRow {
   memory_id: string;
@@ -93,29 +93,57 @@ Deno.serve(async (req) => {
       Instructions: ${coach.custom_instructions || "None"}
     `;
 
-    // Call to gemini
-    const chat = genAI.chats.create({
-      model: "gemini-2.5-flash",
-      config: {
-        systemInstruction: `${CORE_SYSTEM_PROMPT}\n\nCOACH PROFILE:\n${coachContext}`,
-      },
-      history: [
-        createMsg("user", `Long-term memory context:\n${longTermMems}`),
-        createMsg("model", "Acknowledged."),
-        ...formatRecentHistory(recentHistory),
-      ],
-    });
+    const models = [
+      "gemini-2.5-pro",
+      "gemini-2.5-flash",
+      "gemini-2.0-flash-exp",
+      "gemini-1.5-flash",
+      "gemini-1.5-flash-8b"
+    ];
 
-    const result = await chat.sendMessage({ message: userChatMsg });
+    let agentChatMsg: string | null = null;
 
-    const agentChatMsg = result.text;
+    // Call to gemini with fallback models
+    for (let i = 0; i < models.length; i++) {
+      try {
+        const chat = genAI.chats.create({
+          model: models[i],
+          config: {
+            systemInstruction: `${CORE_SYSTEM_PROMPT}\n\nCOACH PROFILE:\n${coachContext}`,
+          },
+          history: [
+            createMsg("user", `Long-term memory context:\n${longTermMems}`),
+            createMsg("model", "Acknowledged."),
+            ...formatRecentHistory(recentHistory),
+          ],
+        });
+
+        const result = await chat.sendMessage({ message: userChatMsg });
+        agentChatMsg = result.text ?? null;
+        
+        console.log(`Successfully used model: ${models[i]}`);
+        break; // Success, exit loop
+        
+      } catch (error: unknown) {
+        // Check if it's a rate limit error
+        const isRateLimit = isRateLimitError(error);
+        
+        if (isRateLimit && i < models.length - 1) {
+          console.warn(`Rate limit reached for ${models[i]}, trying ${models[i + 1]}...`);
+          continue; // Try next model
+        }
+        
+        // If it's the last model or not a rate limit error, throw
+        throw error;
+      }
+    }
 
     if (!agentChatMsg) {
       throw new Error('Empty response from AI');
     }
 
     // update the local buffer
-    updateBuffer(userUUID, coachID, userChatMsg, agentChatMsg);
+    await updateBuffer(userUUID, coachID, userChatMsg, agentChatMsg);
 
     return new Response(
       JSON.stringify({ reply: agentChatMsg }),
