@@ -387,7 +387,7 @@ export default function CreateCoachScreen() {
             </ScrollView>
           </View>
 
-        {/* NAME INPUT */}
+        {/* NAME INPUT -- inside ScrollView so it scrolls with content */}
         <View className="px-6 mb-8">
           <Text className="text-xs font-black text-secondary uppercase tracking-[2px] mb-4">3. Name Your Coach</Text>
           <View className="bg-surface border-[2px] border-foreground/10 rounded-2xl px-4 py-3 flex-row items-center">
@@ -407,6 +407,8 @@ export default function CreateCoachScreen() {
           </View>
           <Text className="text-xs text-secondary mt-2 pl-1">Leave empty to use the default name.</Text>
         </View>
+
+        </ScrollView>
 
         {/* FOOTER */}
         <KeyboardAvoidingView 
